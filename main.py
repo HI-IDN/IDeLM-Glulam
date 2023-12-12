@@ -1,7 +1,7 @@
 # main.py
 import argparse
-from utils.data_processor import filter_glulam_data
-from models.cutting_pattern import generate_cutting_pattern
+from utils.data_processor import GlulamDataProcessor
+from models.cutting_pattern import GlulamPatternProcessor
 from strategies.evolution_strategy import optimize_press_configuration
 from models.packaging import optimize_packaging
 from config.settings import GlulamConfig
@@ -9,18 +9,17 @@ from config.settings import GlulamConfig
 
 def main(file_path, depth):
     # Load and process data
-    processed_data = filter_glulam_data(file_path, depth)
+    data = GlulamDataProcessor(file_path, depth)
 
     # Generate cutting patterns
-    cutting_pattern = generate_cutting_pattern()
+    cutting_patterns = GlulamPatternProcessor(data)
+    cutting_patterns.cutting_stock_column_generation()
 
     # Optimize press configuration
-    press_config = optimize_press_configuration()
+    press_config = optimize_packaging(cutting_patterns)
 
     # Optimize packaging based on press configuration
-    packaging = optimize_packaging()
-
-    # Additional logic as needed
+    packaging = optimize_press_configuration()
 
 
 if __name__ == "__main__":
