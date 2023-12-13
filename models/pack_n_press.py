@@ -48,3 +48,6 @@ def pack_n_press(A, b, H, L, lr, np = 7, flag = 1):
   
   # solve the model
   pmodel.optimize()
+
+  # return all omega values
+  return [omega[k].x for k in K]
