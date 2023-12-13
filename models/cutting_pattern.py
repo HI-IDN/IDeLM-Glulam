@@ -5,7 +5,6 @@ import numpy as np
 import gurobipy as gp
 from tqdm import tqdm  # For progress bar
 
-
 class GlulamPatternProcessor:
     def __init__(self, data, roll_width=None):
         """
@@ -24,11 +23,23 @@ class GlulamPatternProcessor:
             assert roll_width <= GlulamConfig.ROLL_WIDTH, f"Roll width {roll_width} mm exceeds the maximum roll width {GlulamConfig.ROLL_WIDTH} mm."
 
         self._A = None
+        self._H = None
+        self._W = None
 
     @property
     def A(self):
         """ Pattern matrix """
         return self._A
+    
+    @property
+    def H(self):
+        """ Pattern height """
+        return self._H
+
+    @property
+    def W(self):
+        """ Pattern total width """
+        return self._W
 
     @property
     def I(self):
@@ -52,12 +63,16 @@ class GlulamPatternProcessor:
         def initial_pattern():
             """ Generates initial cutting patterns for each order. """
             A = np.zeros((self.data.m, self.data.m))
+            H = np.zeros(self.data.m)
+            W = np.zeros(self.data.m)
             for i in range(self.data.m):
                 A[i, i] = np.floor(self.roll_width / self.data.widths[i])
-            return A
+                H[i] = self.data.heights[i]
+                W[i] = self.data.widths[i] * A[i, i]
+            return A, H, W
 
         # Initialize the pattern matrix and bailout flag
-        self._A = initial_pattern()
+        self._A, self._H, self._W = initial_pattern()
         bailout = False
 
         with tqdm(total=100, leave=False) as pbar:  # total is set to 100 for cycling
@@ -82,8 +97,11 @@ class GlulamPatternProcessor:
                 # Retrieve the dual prices from the constraints
                 pi = [c.Pi for c in cutmodel.getConstrs()]
 
+                # Remove columns in A[:,:] corresponding to x[j] = 0
+                self._A = self._A[:, [j for j in self.J if x[j].X > 0.0000001]]
+
                 # Solve the column generation subproblem
-                self._A, bailout = self._column_generation_subproblem(pi)
+                self._A, self._H, self._W, bailout = self._column_generation_subproblem(pi)
 
                 # Update the progress bar
                 pbar.update(1)
@@ -114,7 +132,7 @@ class GlulamPatternProcessor:
 
         # Decision variables for the knapsack problem
         use = knapmodel.addVars(self.I, lb=0, vtype=gp.GRB.INTEGER)  # Pattern usage variables
-        y = knapmodel.addVar()  # Height of the roll
+        h = knapmodel.addVar()  # Height of the roll
         z = knapmodel.addVars(self.I, vtype=gp.GRB.BINARY)  # Binary variables for height constraints
 
         # Objective: Minimize reduced cost
@@ -125,8 +143,8 @@ class GlulamPatternProcessor:
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
-        knapmodel.addConstrs(y >= self.data.heights[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
-        knapmodel.addConstrs(y <= self.data.heights[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
+        knapmodel.addConstrs(h >= self.data.heights[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
+        knapmodel.addConstrs(h <= self.data.heights[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
 
         # Solve the knapsack problem
         knapmodel.optimize()
@@ -136,7 +154,9 @@ class GlulamPatternProcessor:
             # Add the new pattern to the matrix A
             new_pattern = np.array([[use[i].X] for i in self.I])
             A = np.hstack((self._A, new_pattern))
-            return A, False
+            H = np.hstack((self._H, h.X))
+            W = np.hstack((self._W, np.sum(self.data.widths * new_pattern)))
+            return A, H, W, False
         else:
             # No more patterns with negative reduced cost, stop the process
-            return self._A, True
+            return self._A, self._H, self._W, True
