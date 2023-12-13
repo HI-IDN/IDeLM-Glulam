@@ -30,8 +30,8 @@ def pack_n_press(A, b, H, L, lr, np = 7, flag = 1):
   pmodel.addConstrs(gp.quicksum(H[j]*x[j,k,r] for j in J) == h[k,r] for k in K for r in R)
   # the total height of the region must be less than the maximum height of the press
   pmodel.addConstrs(gp.quicksum(h[k,r] for r in R) <= 26 for k in K)
-  pmodel.addConstrs(gp.quicksum(h[k,r] for r in R) >= 24 for k in K)
-  pmodel.addConstrs(h[k,0] >= 11 for k in K)
+  pmodel.addConstrs(gp.quicksum(h[k,r] for r in R) >= 24 for k in K[:-1]) # the last press is ignored
+  pmodel.addConstrs(h[k,0] >= 11 for k in K[:-1]) #  the last press is ignored
   # note that the length in each region is defined but the heights a free to vary
   pmodel.addConstrs(Lp[k,r] == gp.quicksum(L[j]*x[j,k,r] for j in J) for k in K for r in R)
   # the length of each region must be less than the maximum length of the press
