@@ -20,9 +20,9 @@ def pack_n_press(A, b, H, L, lr, np = 7, flag = 1):
 
   # decision variables
   x = pmodel.addVars(J, K, R, vtype = GRB.INTEGER) # number of times pattern j is used in press k and region r
-  Lp = pmodel.addVars(K,R) # the maximum length of a region in the press
+  Lp = pmodel.addVars(K,R)  # the maximum length of a region in the press
   omega = pmodel.addVars(K) # the total waste in the press (\omega)
-  h = pmodel.addVars(K, R) # what is the height of the region
+  h = pmodel.addVars(K, R)  # what is the height of the region
 
   # the objective is to minimize the waste produced
   pmodel.setObjective(gp.quicksum(omega[p] for p in press), GRB.MINIMIZE)
@@ -41,8 +41,10 @@ def pack_n_press(A, b, H, L, lr, np = 7, flag = 1):
   pmodel.addConstrs(gp.quicksum(A[i,j]*x[j,k,r] for j in J for r in R) >= b[i] for i in I)
 
   # we must compute the waste in each press
-  pmodel.addConstrs(omega[k] == gp.quicksum(H[j]*(Lp[k,r]*x[j,k,r] for j in J for r in R) for k in K)
+  pmodel.addConstrs(omega[k] == gp.quicksum(H[j]*(Lp[k,r]-L[j]*x[j,k,r]) for j in J for r in R) for k in K)
 
+  # now we add the objective function as the sum of waste for all presses
+  pmodel.setObjective(gp.quicksum(omega[p] for p in K), GRB.MINIMIZE)
   
   # solve the model
   pmodel.optimize()
