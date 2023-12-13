@@ -32,7 +32,7 @@ class GlulamDataProcessor:
 
     @property
     def orders(self):
-        return list(self._filtered_data.index)
+        return np.array(self._filtered_data['quantity'].tolist())
 
     @property
     def m(self):
