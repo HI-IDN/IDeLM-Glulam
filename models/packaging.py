@@ -1,58 +1,97 @@
-# models/packaging.py
+import pandas as pd
 import numpy as np
 import gurobipy as gp
 from config.settings import GlulamConfig
-import pandas as pd
 
 
-def optimize_packaging(pat):
-    # Initialize the model
-    cutmodel = gp.Model("Cutting final model")
+class GlulamPressProcessor:
+    """
+    Optimizes the packaging of the glulam orders.
+    """
 
-    # Decision variable, how often should we cut each pattern
-    x = cutmodel.addVars(pat.J, lb=0, vtype=gp.GRB.CONTINUOUS, name="x")  # try also vtype = GRB.INTEGER
+    def __init__(self, pat):
+        self.pat = pat
+        self.results_df = None
+        self.missing_order_info = None
 
-    # Objective: Minimize the total number of patterns used
-    cutmodel.setObjective(gp.quicksum(x[j] for j in pat.J), gp.GRB.MINIMIZE)
+    def optimize_packaging(self):
+        """
+        Optimizes the packaging of the glulam orders.
+        """
+        cut_model = gp.Model("Cutting final model")
+        x = cut_model.addVars(self.pat.J, lb=0, vtype=gp.GRB.CONTINUOUS, name="x")
+        cut_model.setObjective(gp.quicksum(x[j] for j in self.pat.J), gp.GRB.MINIMIZE)
+        cut_model.addConstrs(
+            gp.quicksum(self.pat.A[i, j] * x[j] for j in self.pat.J) >= self.pat.data.orders[i] for i in self.pat.I)
+        cut_model.optimize()
+        # Extract the integer solution via flooring
+        self.x_integer = np.floor([x[j].X for j in self.pat.J]).astype(int)
 
-    # Constraint: Ensure all orders are satisfied
-    cutmodel.addConstrs(gp.quicksum(pat.A[i, j] * x[j] for j in pat.J) >= pat.data.orders[i] for i in pat.I)
+        # Generate the resulting patterns and calculate the missing orders
+        self.results_df = self._generate_patterns()
+        self.missing_order_info = self._calculate_missing_orders()
 
-    # Solve the model
-    cutmodel.optimize()
+    def _generate_patterns(self):
+        """
+        Generates patterns based on the cutting patterns and the integer solution from the cutting stock problem.
+        """
+        assert self.x_integer is not None, "Please run optimize_packaging() first."
 
-    # Extract the integer solution via flooring
-    xfloor = np.floor([x[j].X for j in pat.J])
+        # Initialise results list and press ID and height
+        results = []
+        press_id = press_height = 0
 
-    # TODO clean this up
-    print("Patterns used:")
-    results = []
-    press_id = 0
-    press_height = 0
-    for j in pat.J:
-        if xfloor[j] > 0:
-            for _ in range(int(xfloor[j])):
-                tot_length = np.sum(pat.A[:, j] * pat.data.widths)
-                height = pat.data.heights[list(np.where(np.floor(pat.A[:, j]) > 0))[0][0]] / GlulamConfig.COUNT_HEIGHT
+        # Loop through the patterns
+        for j in self.pat.J:
+            for _ in range(self.x_integer[j]):
+                pattern = self.pat.A[:, j]
+                tot_length = np.sum(pattern * self.pat.data.widths)
+                height_idx = np.argmax(pattern > 0)
+                height = self.pat.data.heights[height_idx] / GlulamConfig.COUNT_HEIGHT
+
                 if press_height + height > GlulamConfig.MAX_HEIGHT:
                     press_height = 0
-                    press_id = press_id + 1
-                press_height = press_height + height
-                results.append(np.hstack((j, height, tot_length, press_id, press_height, pat.A[:, j].T)).tolist())
+                    press_id += 1
 
-    df = pd.DataFrame(np.array(results).astype('int'))
-    missingorder = (pat.data.orders - pat.A @ xfloor.transpose()).astype('int')
+                press_height += height
+                row = [j, height, tot_length, press_id, press_height] + pattern.tolist()
+                results.append(row)
 
-    # print("missingorders = ", missingorder)
-    for i in range(len(missingorder)):
-        if missingorder[i] > 0:
-            print(missingorder[i], "/", pat.data.orders[i], "missing from order", i)
-    print("each roll has length = ", pat.roll_width, " missing material in rollwidth:",
-          np.ceil(missingorder @ pat.data.widths.transpose() / pat.roll_width))
-    print("the total number of rolls used is at least ",
-          int(np.sum(xfloor)) + np.ceil(missingorder @ pat.data.widths.transpose() / pat.roll_width))
-    pontun_nafn = pat.data._filtered_data.index
-    df.columns = ['MynsturID'] + ['haed', 'lengd', 'lota', 'pressuhaed'] + pontun_nafn.tolist()
-    df.to_excel('lausn2.xlsx', index=False)
-    df
+        # Convert the results to a DataFrame
+        column_names = ['PatternID', 'Height', 'TotalLength', 'PressID', 'PressHeight'] + \
+                       ['Order' + str(i) for i in range(self.pat.data.m)]
+        df = pd.DataFrame(results, columns=column_names).astype(int)
+        return df
 
+    def _calculate_missing_orders(self):
+        """
+        Calculates the missing orders and the number of rolls used.
+        """
+        assert self.x_integer is not None
+        missing_order = (self.pat.data.orders - self.pat.A @ self.x_integer).astype('int')
+        missing_per_roll = np.ceil(missing_order @ self.pat.data.widths / self.pat.roll_width).astype('int')
+        total_rolls_used = int(np.sum(self.x_integer)) + missing_per_roll
+
+        return {'Orders': missing_order.tolist(),
+                'MissingPerRoll': missing_per_roll,
+                'Rolls': total_rolls_used
+                }
+
+    def save_results_to_csv(self, filepath):
+        """ Saves the results to a CSV file. """
+        self.results_df.to_csv(filepath, index=False)
+
+    def print_results(self):
+        """ Prints the results and missing order information. """
+        assert self.results_df is not None, "Please run optimize_packaging() first."
+        print("Patterns:")
+        print(self.results_df)
+
+        print("Missing orders:")
+        print("\n".join(
+            f"\tOrder #{i}: {self.missing_order_info['Orders'][i]} / {self.pat.data.orders[i]}"
+            for i in range(self.pat.data.m) if self.missing_order_info['Orders'][i] > 0)
+        )
+
+        print(f"At least {self.missing_order_info['MissingPerRoll']} rolls are needed to satisfy the missing orders.")
+        print(f"Grand total of {self.missing_order_info['Rolls']} rolls are needed.")
