@@ -1,36 +1,48 @@
-def packNpress(df_repeated, np, env, flag = 1):
-  # parameters:
-  bigM = 100000000
-  H = df_repeated['height']
-  T = df_repeated['totlen']
+import gurobipy as gp
+from gurobipy import GRB
+import numpy as np
 
-  #sets:
-  beams = range(len(df_repeated)) # all the beams needed to be stacked in presses in the different regions
-  press = range(np)   # we need to experiment with the number of presses
-  region = [1,2,3]   # the three regions discussed
+def pack_n_press(A, b, H, L, lr, np = 7, flag = 1):
+  
+  # parameters
+  bigM = 100000000 # a big number
 
-  pressmodel = gp.Model("CuttingL", env=env)
-  pressmodel.setParam('OutputFlag', flag)
-  pressmodel.setParam('TimeLimit', 7*60)
+  # sets
+  I = range(A.shape[0]) # items
+  J = range(A.shape[1]) # cutting patterns
+  K = range(np) # presses
+  R = range(2) # regions
 
-  # Decision variables
-  Lp = pressmodel.addVars(press, region, ub = 25000) # the maximum length of a region in the press
-  z = pressmodel.addVars(press, region, beams, vtype = gp.GRB.BINARY) # should beam be in press and region
-  y = pressmodel.addVars(press, vtype = gp.GRB.BINARY) # is region 1 above 28 units?
-  y_ = pressmodel.addVars(press, vtype = gp.GRB.BINARY) # is region 1+3 above 28 units?
-  waste = pressmodel.addVars(press) # the total waste in the press (\omega)
-  s = pressmodel.addVars(press, lb = -9000, ub = 16000) # this slack variable will align region 2 to minimize waste
-  Lp = pressmodel.addVars(press, [12,3], ub = 25000) # the maximum length of the RHS of press 1+2 and region 3
-  w =  pressmodel.addVars(press, region, I) # the waste produced per beam
-  x =  pressmodel.addVars(press, region, vtype = gp.GRB.BINARY) # is the region used?
-  h =  pressmodel.addVars(press, region) # what is the height of the region
+  # model and solve parameters
+  pmodel = gp.Model("pack_n_press") # the packing model
+  pmodel.setParam('OutputFlag', flag) # 0: silent, 1: summary, 2: detailed, 3: verbose
+  pmodel.setParam('TimeLimit', 7 * 60) # 7 minutes
+
+  # decision variables
+  x = pmodel.addVars(J, K, R, vtype = GRB.INTEGER) # number of times pattern j is used in press k and region r
+  Lp = pmodel.addVars(K,R) # the maximum length of a region in the press
+  omega = pmodel.addVars(K) # the total waste in the press (\omega)
+  h = pmodel.addVars(K, R) # what is the height of the region
 
   # the objective is to minimize the waste produced
-  pressmodel.setObjective(gp.quicksum(waste[p] for p in press), gp.GRB.MINIMIZE)
-  # each beam must be packed within some press in some region
-  pressmodel.addConstrs(gp.quicksum(z[p,r,i] for p in press for r in region) == 1 for i in beams )
+  pmodel.setObjective(gp.quicksum(omega[p] for p in press), GRB.MINIMIZE)
+  # compute heigth of each region
+  pmodel.addConstrs(gp.quicksum(H[j]*x[j,k,r] for j in J) == h[k,r] for k in K for r in R)
+  # the total height of the region must be less than the maximum height of the press
+  pmodel.addConstrs(gp.quicksum(h[k,r] for r in R) <= 26 for k in K)
+  pmodel.addConstrs(gp.quicksum(h[k,r] for r in R) >= 24 for k in K)
+  pmodel.addConstrs(h[k,0] >= 11 for k in K)
+  # note that the length in each region is defined but the heights a free to vary
+  pmodel.addConstrs(Lp[k,r] == gp.quicksum(L[j]*x[j,k,r] for j in J) for k in K for r in R)
+  # the length of each region must be less than the maximum length of the press
+  pmodel.addConstrs(Lp[k,r] <= lr[k,r] for k in K for r in R)
 
-  # TODO TASK 3 !!!! add the missing constraints!
+  # now we must fulfill the demand for each item
+  pmodel.addConstrs(gp.quicksum(A[i,j]*x[j,k,r] for j in J for r in R) >= b[i] for i in I)
 
+  # we must compute the waste in each press
+  pmodel.addConstrs(omega[k] == gp.quicksum(H[j]*(Lp[k,r]*x[j,k,r] for j in J for r in R) for k in K)
+
+  
   # solve the model
-  pressmodel.optimize()
+  pmodel.optimize()
