@@ -1,44 +1,27 @@
 # main.py
 import argparse
 from utils.data_processor import GlulamDataProcessor
-from models.cutting_pattern import GlulamPatternProcessor
+from models.cutting_pattern import ExtendedGlulamPatternProcessor
 from strategies.evolution_strategy import optimize_press_configuration
-from models.packaging import GlulamPressProcessor
 from models.pack_n_press import pack_n_press
 from config.settings import GlulamConfig
 import numpy as np
+
 
 def main(file_path, depth):
     # Load and process data
     data = GlulamDataProcessor(file_path, depth)
 
-    # Generate cutting patterns
-    cutting_patterns1 = GlulamPatternProcessor(data, roll_width=25000)
-    cutting_patterns1.cutting_stock_column_generation()
-    A1 = cutting_patterns1.A
-    H1 = cutting_patterns1.H
-    W1 = cutting_patterns1.W
-    cutting_patterns2 = GlulamPatternProcessor(data, roll_width=16000)
-    cutting_patterns2.cutting_stock_column_generation()
-    A2 = cutting_patterns2.A
-    H2 = cutting_patterns2.H
-    W2 = cutting_patterns2.W
-    H = np.concatenate((H1,H2))
-    W = np.concatenate((W1,W2))
-    A = np.hstack((A1,A2))
-
     # Pack the patterns into presses that all look like this:
-    wr = [(25000, 16000) for _ in range(7)]
-    waste, Lp = pack_n_press(A, data.orders, H, W, wr)
-    print(waste)
-    # Pack the patterns
-    #press_processor = GlulamPressProcessor(cutting_patterns)
-    #press_processor.optimize_packaging()
-    #press_processor.print_results()
-    #press_processor.save_results_to_csv('data/packaged_patterns.csv')
+    wr = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
+    # Generate cutting patterns
+    roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
+    merged = ExtendedGlulamPatternProcessor(data, roll_widths)
+    waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr)
+    print(true_waste)
 
     # Optimize the press configuration
-    #press_config = optimize_press_configuration()
+    # press_config = optimize_press_configuration()
 
 
 if __name__ == "__main__":

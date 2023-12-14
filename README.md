@@ -10,7 +10,7 @@ IDeLM-Glulam/
 ├── models/
 │   ├── __init__.py
 │   ├── cutting_pattern.py      # Code for cutting pattern generation (Gurobi MIP)
-│   └── packaging.py            # Code for packaging optimization (Gurobi MIP)
+│   └── pack_n_press.py         # Code for packaging optimization (Gurobi MIP)
 │
 ├── strategies/
 │   ├── __init__.py

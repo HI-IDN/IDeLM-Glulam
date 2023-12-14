@@ -15,12 +15,12 @@ class GlulamDataProcessor:
         # Filter and update the filtered data
         self._filtered_data = self._raw_data[self._raw_data['depth'] == depth]
 
-        # Sanity check: height should be a multiple of count height
-        assert (GlulamConfig.COUNT_HEIGHT * self._filtered_data['count'] == self._filtered_data['height']).all(), \
+        # Sanity check: height should be a multiple of layer height
+        assert (GlulamConfig.LAYER_HEIGHT * self._filtered_data['layers'] == self._filtered_data['height']).all(), \
             "Height mismatch. Check input data."
 
         # Sanity check: width should be less than ROLL_WIDTH
-        assert (GlulamConfig.ROLL_WIDTH > self._filtered_data['width']).all(), \
+        assert (GlulamConfig.MAX_ROLL_WIDTH >= self._filtered_data['width']).all(), \
             "Width mismatch. Check input data."
 
         # Reset index
@@ -35,7 +35,7 @@ class GlulamDataProcessor:
         return np.array(self._filtered_data['height'].tolist())
 
     @property
-    def orders(self):
+    def quantity(self):
         return np.array(self._filtered_data['quantity'].tolist())
 
     @property
