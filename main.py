@@ -12,15 +12,14 @@ def main(file_path, depth):
     # Load and process data
     data = GlulamDataProcessor(file_path, depth)
 
+    # Pack the patterns into presses that all look like this:
+    wr = [(25000, 16000) for _ in range(7)]
     # Generate cutting patterns
-    merged = ExtendedGlulamPatternProcessor(data, roll_widths=[25000, 24000])
-
+    roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
+    merged = ExtendedGlulamPatternProcessor(data, roll_widths)
     H = merged.H
     W = merged.W
     A = merged.A
-
-    # Pack the patterns into presses that all look like this:
-    wr = [(25000, 16000) for _ in range(7)]
     waste, Lp = pack_n_press(A, data.quantity, H, W, wr)
     print(waste)
 
