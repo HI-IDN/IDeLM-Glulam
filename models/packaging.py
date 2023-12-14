@@ -49,7 +49,7 @@ class GlulamPressProcessor:
                 pattern = self.pat.A[:, j]
                 tot_length = np.sum(pattern * self.pat.data.widths)
                 height_idx = np.argmax(pattern > 0)
-                height = self.pat.data.heights[height_idx] / GlulamConfig.COUNT_HEIGHT
+                height = self.pat.data.heights[height_idx] / GlulamConfig.LAYER_HEIGHT
 
                 if press_height + height > GlulamConfig.MAX_HEIGHT:
                     press_height = 0

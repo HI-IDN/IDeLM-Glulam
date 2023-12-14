@@ -17,10 +17,11 @@ class GlulamPatternProcessor:
         self.data = data
 
         if roll_width is None:
-            self.roll_width = GlulamConfig.ROLL_WIDTH
+            self.roll_width = GlulamConfig.MAX_ROLL_WIDTH
         else:
             self.roll_width = roll_width
-            assert roll_width <= GlulamConfig.ROLL_WIDTH, f"Roll width {roll_width} mm exceeds the maximum roll width {GlulamConfig.ROLL_WIDTH} mm."
+            assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
+                                                               f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
 
         self._A = None
         self._H = None
@@ -33,9 +34,14 @@ class GlulamPatternProcessor:
 
     @property
     def b(self):
-        """ The demand for each order, a vector of size m, such that Ax = b """
-        return self.data.quantity
-    
+        """ The demand for each order, a vector of size m, such that Ax = b.
+
+        This vector represents the quantities for each order type, filtered such that only those orders are
+        considered where the item width does not exceed the roll width.
+        In other words, this method ignores the quantities for item widths larger than the roll width.
+        """
+        return [q for q, w in zip(self.data.quantity, self.data.widths) if w <= self.roll_width]
+
     @property
     def H(self):
         """ Pattern height """
@@ -72,49 +78,54 @@ class GlulamPatternProcessor:
             W = np.zeros(self.data.m)
             for i in range(self.data.m):
                 A[i, i] = np.floor(self.roll_width / self.data.widths[i])
-                #assert A[i, i] > 0, f"Roll width {self.roll_width} mm is too small for the order width {self.data.widths[i]} mm."
-                if A[i,i] < 1:
-                    A[i,i] = 1
                 H[i] = self.data.heights[i]
                 W[i] = self.data.widths[i] * A[i, i]
+
+            # Final check to ensure all diagonal elements in A are greater than 0
+            if not np.all(np.diag(A) > 0):
+                raise ValueError("Invalid pattern matrix: Some diagonal elements in A are not greater than 0.")
+
             return A, H, W
 
         # Initialize the pattern matrix and bailout flag
         self._A, self._H, self._W = initial_pattern()
         bailout = False
-        delta = 6
 
-        with tqdm(total=100, leave=False) as pbar:  # total is set to 100 for cycling
+        with tqdm(total=100, leave=False) as pbar:  # total is set to 100 for cycling.
             while not bailout:
                 # Create the cutting model
-                cutmodel = gp.Model("Cutting")
-                cutmodel.setParam('OutputFlag', 0)
+                cut_model = gp.Model("Cutting")
+                cut_model.setParam('OutputFlag', 0)
 
                 # Decision variables: how often to cut each pattern
-                x = cutmodel.addVars(self.J)  # Note this a continuous variable in order to get shadow prices later
+                x = cut_model.addVars(self.J)  # Note this a continuous variable in order to get shadow prices later
 
                 # Objective: Minimize the total number of patterns used
-                cutmodel.setObjective(gp.quicksum(x[j] for j in self.J), gp.GRB.MINIMIZE)
+                cut_model.setObjective(gp.quicksum(x[j] for j in self.J), gp.GRB.MINIMIZE)
 
                 # Constraints: Ensure all orders are satisfied
-                cutmodel.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
-                                    for i in self.I)
-                cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i] - delta
-                                    for i in self.I)
+                cut_model.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
+                                     for i in self.I)
+                # Constraints: Ensure no more than MAX_SURPLUS_QUANTITY pieces are left over
+                if GlulamConfig.SURPLUS_LIMIT > 0:
+                    cut_model.addConstrs(
+                        -gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i] - GlulamConfig.SURPLUS_LIMIT
+                        for i in self.I)
 
                 # Solve the master problem
-                cutmodel.optimize()
+                cut_model.optimize()
 
                 # Retrieve the dual prices from the constraints
-                pi = [c.Pi for c in cutmodel.getConstrs()]
-                pi = [pi[i]-pi[i+self.data.m] for i in range(self.data.m)]
+                pi = [c.Pi for c in cut_model.getConstrs()]
+                if GlulamConfig.SURPLUS_LIMIT > 0:  # Adjust the dual prices if surplus limit is used
+                    pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]
 
                 # Remove columns in A[:,:] corresponding to x[j] = 0
                 self._H = self._H[[j for j in self.J if x[j].X > 0.0000001]]
                 self._W = self._W[[j for j in self.J if x[j].X > 0.0000001]]
                 self._A = self._A[:, [j for j in self.J if x[j].X > 0.0000001]]
 
-                # Solve the column generation subproblem
+                # Solve the column generation sub problem
                 self._A, self._H, self._W, bailout = self._column_generation_subproblem(pi)
 
                 # Update the progress bar
@@ -139,6 +150,7 @@ class GlulamPatternProcessor:
         """
         # A large number for big-M method in MIP
         bigM = 1000000
+        Delta = 50
 
         # Initialize the knapsack model
         knapmodel = gp.Model("Knapsack")
@@ -154,6 +166,7 @@ class GlulamPatternProcessor:
 
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
+        knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) >= self.roll_width - Delta)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
@@ -163,12 +176,10 @@ class GlulamPatternProcessor:
         # Solve the knapsack problem
         knapmodel.optimize()
 
-        # check if a pattern was found:
-        new_pattern = np.array([[int(use[i].X)] for i in self.I])
-
         # Check if a new pattern with negative reduced cost is found
-        if knapmodel.objval < -0.0000001 and np.sum(new_pattern) > 0.01:
+        if knapmodel.objval < -0.0000001:
             # Add the new pattern to the matrix A
+            new_pattern = np.array([[int(use[i].X)] for i in self.I])
             A = np.hstack((self._A, new_pattern))
             H = np.concatenate((self._H, np.array([h.X])))
             tmp = np.array(np.sum([use[i].X*self.data.widths[i] for i in self.I])).flatten()
@@ -178,3 +189,38 @@ class GlulamPatternProcessor:
         else:
             # No more patterns with negative reduced cost, stop the process
             return self._A, self._H, self._W, True
+
+
+class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
+    def __init__(self, data, roll_widths):
+        """
+        Initializes the ExtendedGlulamPatternProcessor with the necessary data and multiple roll widths.
+
+        Parameters:
+        - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
+        - roll_widths (list): A list of roll widths to generate patterns for.
+        """
+        super().__init__(data, roll_width=None)  # Initialize the base class
+        self.roll_widths = roll_widths
+        self._generate_and_combine_patterns()
+
+    def _generate_and_combine_patterns(self):
+        """
+        Generates and combines patterns for each roll width.
+        """
+        self._A, self._H, self._W = None, None, None
+
+        print(f'Generating patterns for roll widths: {self.roll_widths}')
+        for i, roll_width in enumerate(self.roll_widths):
+            pattern = GlulamPatternProcessor(self.data, roll_width)
+            pattern.cutting_stock_column_generation()
+            print(f'#{i} {roll_width}mm: A is {pattern.A.shape} matrix')
+
+            if self._A is None:
+                self._A, self._H, self._W = pattern.A, pattern.H, pattern.W
+            else:
+                self._A = np.hstack((self._A, pattern.A))
+                self._H = np.concatenate((self._H, pattern.H))
+                self._W = np.concatenate((self._W, pattern.W))
+
+        print(f'=> Combined A is {self.A.shape} matrix')
