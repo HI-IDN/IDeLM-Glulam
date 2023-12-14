@@ -4,17 +4,24 @@ import numpy as np
 from config.settings import GlulamConfig
 
 
-def pack_n_press(A, b, H, L, wr, debug=True):
+def pack_n_press(merged, wr):
+    debug = False
+
+    H = merged.H
+    L = merged.W
+    A = merged.A
+    b = merged.b
+
     # parameters
     bigM = 100000000  # a big number
     nump = len(wr)
-    print("number of presses:", np)
+    print("number of presses:", nump)
 
     # sets
     I = range(A.shape[0])  # items
     J = range(A.shape[1])  # cutting patterns
     K = range(nump)  # presses
-    R = range(2)  # regions
+    R = range(len(GlulamConfig.MIN_HEIGHT_LAYER_REGION))  # regions
 
     # debug:
     if debug == True:
@@ -28,7 +35,6 @@ def pack_n_press(A, b, H, L, wr, debug=True):
 
     # decision variables
     x = pmodel.addVars(J, K, R, vtype=GRB.INTEGER)  # number of times pattern j is used in press k and region r
-    x1 = pmodel.addVars(J, K, R, vtype=GRB.BINARY)  # is pattern j used in press k and region r
 
     omega = pmodel.addVars(K, R)  # the total waste in the press (\omega)
     delta = pmodel.addVars(I)  # the difference between demand and supply
@@ -56,10 +62,6 @@ def pack_n_press(A, b, H, L, wr, debug=True):
         gp.quicksum(h[k, r] for r in R) >=
         GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] * GlulamConfig.LAYER_HEIGHT - (1 - z[k]) * bigM for k in K[:-1])
 
-    # we want to make sure that wr[k][r]-L[j] >= 0 if j used in region k,r
-    pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
-    pmodel.addConstrs(wr[k][r] >= L[j] - bigM * (1 - x1[j, k, r]) for j in J for k in K for r in R)
-
     # if the press is not used the x must be zero
     pmodel.addConstrs(x[j, k, r] <= bigM * z[k] for j in J for k in K for r in R)
 
@@ -70,6 +72,8 @@ def pack_n_press(A, b, H, L, wr, debug=True):
     # we must compute the waste in each press
     pmodel.addConstrs(
         omega[k, r] == gp.quicksum(H[j] * (wr[k][r] - L[j]) * x[j, k, r] for j in J) for k in K for r in R)
+
+    pmodel.addConstr(gp.quicksum(x[j, k, r] for j in J for k in K for r in R if L[j] > wr[k][r]) == 0)
 
     # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
     pmodel.setObjective(
