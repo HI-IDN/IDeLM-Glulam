@@ -261,4 +261,24 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
                 self._H = np.concatenate((self._H, pattern.H))
                 self._W = np.concatenate((self._W, pattern.W))
 
+        self._remove_duplicate_patterns()
         print(f'=> Combined A is {self.A.shape} matrix')
+
+    def _remove_duplicate_patterns(self):
+        """
+        Removes duplicate patterns from the pattern matrix A, and corresponding entries in H and W arrays.
+        """
+        old_shape = self._A.shape
+
+        # Combine A, H, and W into a single matrix
+        combined_matrix = np.column_stack((self._A.T, self._H, self._W))
+
+        # Use numpy's unique function to find unique rows and their indices
+        unique_matrix, indices = np.unique(combined_matrix, axis=0, return_index=True)
+
+        # Extract the unique values back to A, H, W
+        self._A = unique_matrix[:, :-2].T  # All but the last two columns (and transpose to get back to original shape)
+        self._H = unique_matrix[:, -2]  # Second-to-last column
+        self._W = unique_matrix[:, -1]  # Last column
+
+        print(f'=> Combined A is {self.A.shape} matrix after removing duplicates (from {old_shape})')
