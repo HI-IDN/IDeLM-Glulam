@@ -5,8 +5,23 @@ from config.settings import GlulamConfig
 
 
 def pack_n_press(merged, wr):
-    debug = False
+    """
+    Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
+    1) to minimize the waste and 2) to minimize the difference between demand and supply.
 
+    Parameters:
+    - merged (ExtendedGlulamPatternProcessor): The glulam pattern data, merged into a single object for a set of
+                                               several press configurations.
+    - np (int): The number of presses to use.
+
+    Returns:
+    - omega (np.array): The waste in each press and each region.
+    - Waste_ (np.array): The total waste in each press and each region.
+    - z (np.array): Whether each press is used or not.
+    - Lp_ (np.array): The length of each press.
+    - delta (np.array): The difference between demand and supply for each item.
+    """
+    debug = True
     H = merged.H
     L = merged.W
     A = merged.A
@@ -22,11 +37,6 @@ def pack_n_press(merged, wr):
     J = range(A.shape[1])  # cutting patterns
     K = range(nump)  # presses
     R = range(len(GlulamConfig.MIN_HEIGHT_LAYER_REGION))  # regions
-
-    # debug:
-    if debug == True:
-        for i in I:
-            print("item", i, "width", L[i], "height", H[i], "demand", b[i])
 
     # model and solve parameters
     pmodel = gp.Model("pack_n_press")  # the packing model
@@ -87,7 +97,7 @@ def pack_n_press(merged, wr):
     # see if model is infeasible
     if pmodel.status == GRB.INFEASIBLE:
         print("The model is infeasible; quitting.")
-        return None, None
+        return None, None, None, None, None
 
     # extract the solution
     Lp_ = np.zeros((len(K), len(R)))  # the length of the press
@@ -103,16 +113,17 @@ def pack_n_press(merged, wr):
     if debug == True:
         print_press_results(K, R, Lp_, h, omega, Waste_)
         print_item_results(A, b, K, R, I, J, H, L, x, wr, delta)
+        print_item_only_results(b, I, H, L)
 
     # return all omega values
-    return Waste_, Lp_
+    return omega, Waste_, z, Lp_, delta
 
 
 def print_press_results(K, R, Lp_, h, omega, Waste_):
     """ Print the information about the presses. """
     print("\n\nTable: Press Information\n")
     row_format = "{:<5} {:>6} {:>6} {:>6} {:>6}"
-    header = ['Press', 'Width', 'Height', 'Waste', 'TotalWaste']
+    header = ['Press', 'Width', 'Height', 'TrueWaste', 'ObjWaste']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
@@ -127,6 +138,11 @@ def print_press_results(K, R, Lp_, h, omega, Waste_):
                           f"{Waste_[k, r]:.2f}", f"{omega[k, r].X / 1000 / 1000:.2f}"]
             print(row_format.format(*press_info))
     print(seperator_major)
+
+
+def print_item_only_results(b, I, H, L):
+    for i in I:
+        print("item", i, "width", L[i], "height", H[i], "demand", b[i])
 
 
 def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):

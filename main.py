@@ -17,8 +17,8 @@ def main(file_path, depth):
     # Generate cutting patterns
     roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
     merged = ExtendedGlulamPatternProcessor(data, roll_widths)
-    waste, Lp = pack_n_press(merged, wr)
-    print(waste)
+    waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr)
+    print(true_waste)
 
     # Optimize the press configuration
     # press_config = optimize_press_configuration()
