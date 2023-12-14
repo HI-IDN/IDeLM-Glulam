@@ -22,10 +22,12 @@ class GlulamPressProcessor:
         x = cut_model.addVars(self.pat.J, lb=0, vtype=gp.GRB.CONTINUOUS, name="x")
         cut_model.setObjective(gp.quicksum(x[j] for j in self.pat.J), gp.GRB.MINIMIZE)
         cut_model.addConstrs(
-            gp.quicksum(self.pat.A[i, j] * x[j] for j in self.pat.J) >= self.pat.data.orders[i] for i in self.pat.I)
+            gp.quicksum(self.pat.A[i, j] * x[j] for j in self.pat.J) >= self.pat.b[i] for i in self.pat.I)
         cut_model.optimize()
+
         # Extract the integer solution via flooring
-        self.x_integer = np.floor([x[j].X for j in self.pat.J]).astype(int)
+        self.x = np.floor([x[j].X for j in self.pat.J]).astype(int)
+        """ x is the number of times each pattern is cut (integer). """
 
         # Generate the resulting patterns and calculate the missing orders
         self.results_df = self._generate_patterns()
@@ -35,7 +37,7 @@ class GlulamPressProcessor:
         """
         Generates patterns based on the cutting patterns and the integer solution from the cutting stock problem.
         """
-        assert self.x_integer is not None, "Please run optimize_packaging() first."
+        assert self.x is not None, "Please run optimize_packaging() first."
 
         # Initialise results list and press ID and height
         results = []
@@ -43,7 +45,7 @@ class GlulamPressProcessor:
 
         # Loop through the patterns
         for j in self.pat.J:
-            for _ in range(self.x_integer[j]):
+            for _ in range(self.x[j]):
                 pattern = self.pat.A[:, j]
                 tot_length = np.sum(pattern * self.pat.data.widths)
                 height_idx = np.argmax(pattern > 0)
@@ -67,10 +69,10 @@ class GlulamPressProcessor:
         """
         Calculates the missing orders and the number of rolls used.
         """
-        assert self.x_integer is not None
-        missing_order = (self.pat.data.orders - self.pat.A @ self.x_integer).astype('int')
+        assert self.x is not None
+        missing_order = (self.pat.b - self.pat.A @ self.x).astype('int')
         missing_per_roll = np.ceil(missing_order @ self.pat.data.widths / self.pat.roll_width).astype('int')
-        total_rolls_used = int(np.sum(self.x_integer)) + missing_per_roll
+        total_rolls_used = int(np.sum(self.x)) + missing_per_roll
 
         return {'Orders': missing_order.tolist(),
                 'MissingPerRoll': missing_per_roll,
@@ -89,7 +91,7 @@ class GlulamPressProcessor:
 
         print("Missing orders:")
         print("\n".join(
-            f"\tOrder #{i}: {self.missing_order_info['Orders'][i]} / {self.pat.data.orders[i]}"
+            f"\tOrder #{i}: {self.missing_order_info['Orders'][i]} / {self.pat.b[i]}"
             for i in range(self.pat.data.m) if self.missing_order_info['Orders'][i] > 0)
         )
 

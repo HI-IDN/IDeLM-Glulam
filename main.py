@@ -33,7 +33,7 @@ def main(file_path, depth):
 
     # Pack the patterns into presses that all look like this:
     wr = [(25000, 16000) for _ in range(8)]
-    waste = pack_n_press(A, data.orders, H, W, wr)
+    waste = pack_n_press(A, data.quantity, H, W, wr)
     print(waste)
     # Pack the patterns
     #press_processor = GlulamPressProcessor(cutting_patterns)

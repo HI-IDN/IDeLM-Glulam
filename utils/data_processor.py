@@ -35,7 +35,7 @@ class GlulamDataProcessor:
         return np.array(self._filtered_data['height'].tolist())
 
     @property
-    def orders(self):
+    def quantity(self):
         return np.array(self._filtered_data['quantity'].tolist())
 
     @property

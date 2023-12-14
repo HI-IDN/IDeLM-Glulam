@@ -28,8 +28,13 @@ class GlulamPatternProcessor:
 
     @property
     def A(self):
-        """ Pattern matrix """
+        """ Pattern matrix, a matrix of size m x n, where m is the number of orders and n is the number of patterns. """
         return self._A
+
+    @property
+    def b(self):
+        """ The demand for each order, a vector of size m, such that Ax = b """
+        return self.data.quantity
     
     @property
     def H(self):
@@ -43,12 +48,12 @@ class GlulamPatternProcessor:
 
     @property
     def I(self):
-        """ Number of orders """
+        """ Number of orders, i.e. the number of rows in the pattern matrix 0 <= i < m """
         return range(self.data.m)
 
     @property
     def J(self):
-        """ Number of patterns """
+        """ Number of patterns, i.e. the number of columns in the pattern matrix 0 <= j < n """
         return range(self._A.shape[1])
 
     def cutting_stock_column_generation(self):
@@ -92,9 +97,9 @@ class GlulamPatternProcessor:
                 cutmodel.setObjective(gp.quicksum(x[j] for j in self.J), gp.GRB.MINIMIZE)
 
                 # Constraints: Ensure all orders are satisfied
-                cutmodel.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.data.orders[i]
+                cutmodel.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
                                     for i in self.I)
-                cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.data.orders[i] - delta
+                cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i] - delta
                                     for i in self.I)
 
                 # Solve the master problem
