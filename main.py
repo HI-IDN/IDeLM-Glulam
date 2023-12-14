@@ -13,7 +13,7 @@ def main(file_path, depth):
     data = GlulamDataProcessor(file_path, depth)
 
     # Pack the patterns into presses that all look like this:
-    wr = [(25000, 16000) for _ in range(7)]
+    wr = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
     # Generate cutting patterns
     roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
     merged = ExtendedGlulamPatternProcessor(data, roll_widths)
