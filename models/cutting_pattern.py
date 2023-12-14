@@ -67,6 +67,9 @@ class GlulamPatternProcessor:
             W = np.zeros(self.data.m)
             for i in range(self.data.m):
                 A[i, i] = np.floor(self.roll_width / self.data.widths[i])
+                #assert A[i, i] > 0, f"Roll width {self.roll_width} mm is too small for the order width {self.data.widths[i]} mm."
+                if A[i,i] < 1:
+                    A[i,i] = 1
                 H[i] = self.data.heights[i]
                 W[i] = self.data.widths[i] * A[i, i]
             return A, H, W
@@ -74,6 +77,7 @@ class GlulamPatternProcessor:
         # Initialize the pattern matrix and bailout flag
         self._A, self._H, self._W = initial_pattern()
         bailout = False
+        delta = 6
 
         with tqdm(total=100, leave=False) as pbar:  # total is set to 100 for cycling
             while not bailout:
@@ -90,14 +94,19 @@ class GlulamPatternProcessor:
                 # Constraints: Ensure all orders are satisfied
                 cutmodel.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.data.orders[i]
                                     for i in self.I)
+                cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.data.orders[i] - delta
+                                    for i in self.I)
 
                 # Solve the master problem
                 cutmodel.optimize()
 
                 # Retrieve the dual prices from the constraints
                 pi = [c.Pi for c in cutmodel.getConstrs()]
+                pi = [pi[i]-pi[i+self.data.m] for i in range(self.data.m)]
 
                 # Remove columns in A[:,:] corresponding to x[j] = 0
+                self._H = self._H[[j for j in self.J if x[j].X > 0.0000001]]
+                self._W = self._W[[j for j in self.J if x[j].X > 0.0000001]]
                 self._A = self._A[:, [j for j in self.J if x[j].X > 0.0000001]]
 
                 # Solve the column generation subproblem
@@ -154,8 +163,8 @@ class GlulamPatternProcessor:
             # Add the new pattern to the matrix A
             new_pattern = np.array([[use[i].X] for i in self.I])
             A = np.hstack((self._A, new_pattern))
-            H = np.hstack((self._H, h.X))
-            W = np.hstack((self._W, np.sum(self.data.widths * new_pattern)))
+            H = np.concatenate((self._H, np.array([h.X])))
+            W = np.concatenate((self._W, np.array([np.sum(self.data.widths * new_pattern)])))
             return A, H, W, False
         else:
             # No more patterns with negative reduced cost, stop the process
