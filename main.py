@@ -18,7 +18,7 @@ def main(file_path, depth):
     A1 = cutting_patterns1.A
     H1 = cutting_patterns1.H
     W1 = cutting_patterns1.W
-    cutting_patterns2 = GlulamPatternProcessor(data, roll_width=24000)
+    cutting_patterns2 = GlulamPatternProcessor(data, roll_width=16000)
     cutting_patterns2.cutting_stock_column_generation()
     A2 = cutting_patterns2.A
     H2 = cutting_patterns2.H

@@ -46,7 +46,7 @@ def pack_n_press(A, b, H, L, wr, flag = 1, debug = True):
   # note that the length in each region is defined but the heights a free to vary
   pmodel.addConstrs(Lp[k,r] >= L[j] - bigM*x[j,k,r] for j in J for k in K for r in R)
   # the length of each region must be less than the maximum length of the press
-  #pmodel.addConstrs(Lp[k,r] <= wr[k][r] + (1-z[k])*bigM for k in K for r in R if wr[k][r] > 0.1)
+  # pmodel.addConstrs(Lp[k,r] <= wr[k][r] + (1-z[k])*bigM for k in K for r in R if wr[k][r] > 0.1)
 
   # if the press is not used the x must be zero
   pmodel.addConstrs(x[j,k,r] <= bigM*z[k] for j in J for k in K for r in R)

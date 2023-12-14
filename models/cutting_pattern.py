@@ -94,15 +94,15 @@ class GlulamPatternProcessor:
                 # Constraints: Ensure all orders are satisfied
                 cutmodel.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.data.orders[i]
                                     for i in self.I)
-                cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.data.orders[i] - delta
-                                    for i in self.I)
+                #cutmodel.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.data.orders[i] - delta
+                #                    for i in self.I)
 
                 # Solve the master problem
                 cutmodel.optimize()
 
                 # Retrieve the dual prices from the constraints
                 pi = [c.Pi for c in cutmodel.getConstrs()]
-                pi = [pi[i]-pi[i+self.data.m] for i in range(self.data.m)]
+                #pi = [pi[i]-pi[i+self.data.m] for i in range(self.data.m)]
 
                 # Remove columns in A[:,:] corresponding to x[j] = 0
                 self._H = self._H[[j for j in self.J if x[j].X > 0.0000001]]
@@ -134,6 +134,7 @@ class GlulamPatternProcessor:
         """
         # A large number for big-M method in MIP
         bigM = 1000000
+        Delta = 50
 
         # Initialize the knapsack model
         knapmodel = gp.Model("Knapsack")
@@ -149,6 +150,7 @@ class GlulamPatternProcessor:
 
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
+        knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) >= self.roll_width - Delta)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
@@ -158,12 +160,10 @@ class GlulamPatternProcessor:
         # Solve the knapsack problem
         knapmodel.optimize()
 
-        # check if a pattern was found:
-        new_pattern = np.array([[int(use[i].X)] for i in self.I])
-
         # Check if a new pattern with negative reduced cost is found
-        if knapmodel.objval < -0.0000001 and np.sum(new_pattern) > 0.01:
+        if knapmodel.objval < -0.0000001:
             # Add the new pattern to the matrix A
+            new_pattern = np.array([[int(use[i].X)] for i in self.I])
             A = np.hstack((self._A, new_pattern))
             H = np.concatenate((self._H, np.array([h.X])))
             tmp = np.array(np.sum([use[i].X*self.data.widths[i] for i in self.I])).flatten()
