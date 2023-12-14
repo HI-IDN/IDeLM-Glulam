@@ -18,15 +18,17 @@ def main(file_path, depth):
     A1 = cutting_patterns1.A
     H1 = cutting_patterns1.H
     W1 = cutting_patterns1.W
+    print(W1)
     cutting_patterns2 = GlulamPatternProcessor(data, roll_width=24000)
     cutting_patterns2.cutting_stock_column_generation()
     A2 = cutting_patterns2.A
     H2 = cutting_patterns2.H
     W2 = cutting_patterns2.W
-
+    print(W2)
     H = np.concatenate((H1,H2))
     W = np.concatenate((W1,W2))
     A = np.hstack((A1,A2))
+    print(W)
     print(A1.shape, A2.shape, A.shape,H1.shape,H2.shape,W1.shape,W2.shape)
 
     # Pack the patterns into presses that all look like this:

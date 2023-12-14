@@ -158,13 +158,15 @@ class GlulamPatternProcessor:
         # Solve the knapsack problem
         knapmodel.optimize()
 
+        # check if a pattern was found:
+        new_pattern = np.array([[int(use[i].X)] for i in self.I])
+
         # Check if a new pattern with negative reduced cost is found
-        if knapmodel.objval < -0.0000001:
+        if knapmodel.objval < -0.0000001 and np.sum(new_pattern) > 0.01:
             # Add the new pattern to the matrix A
-            new_pattern = np.array([[use[i].X] for i in self.I])
             A = np.hstack((self._A, new_pattern))
             H = np.concatenate((self._H, np.array([h.X])))
-            W = np.concatenate((self._W, np.array([np.sum(self.data.widths * new_pattern)])))
+            W = np.concatenate((self._W, np.array([use[i].X*self.data.widths[i] for i in self.I])))
             return A, H, W, False
         else:
             # No more patterns with negative reduced cost, stop the process

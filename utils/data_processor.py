@@ -19,6 +19,10 @@ class GlulamDataProcessor:
         assert (GlulamConfig.COUNT_HEIGHT * self._filtered_data['count'] == self._filtered_data['height']).all(), \
             "Height mismatch. Check input data."
 
+        # Sanity check: width should be less than ROLL_WIDTH
+        assert (GlulamConfig.ROLL_WIDTH > self._filtered_data['width']).all(), \
+            "Width mismatch. Check input data."
+
         # Reset index
         self._filtered_data.reset_index(drop=True, inplace=True)
 
