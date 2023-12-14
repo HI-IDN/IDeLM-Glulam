@@ -5,6 +5,7 @@ import numpy as np
 import gurobipy as gp
 from tqdm import tqdm  # For progress bar
 
+
 class GlulamPatternProcessor:
     def __init__(self, data, roll_width=None):
         """
@@ -40,7 +41,7 @@ class GlulamPatternProcessor:
         considered where the item width does not exceed the roll width.
         In other words, this method ignores the quantities for item widths larger than the roll width.
         """
-        return [q for q, w in zip(self.data.quantity, self.data.widths) if w <= self.roll_width]
+        return [q if w <= self.roll_width else 0 for q, w in zip(self.data.quantity, self.data.widths)]
 
     @property
     def H(self):
@@ -166,7 +167,8 @@ class GlulamPatternProcessor:
 
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
-        knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) >= self.roll_width - Delta)  # Width limit
+        knapmodel.addConstr(
+            gp.quicksum(self.data.widths[i] * use[i] for i in self.I) >= self.roll_width - Delta)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
@@ -182,7 +184,7 @@ class GlulamPatternProcessor:
             new_pattern = np.array([[int(use[i].X)] for i in self.I])
             A = np.hstack((self._A, new_pattern))
             H = np.concatenate((self._H, np.array([h.X])))
-            tmp = np.array(np.sum([use[i].X*self.data.widths[i] for i in self.I])).flatten()
+            tmp = np.array(np.sum([use[i].X * self.data.widths[i] for i in self.I])).flatten()
             # print("debug: tmp=", tmp)
             W = np.concatenate((self._W, tmp))
             return A, H, W, False
