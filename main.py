@@ -28,7 +28,7 @@ def main(file_path, depth):
     A = np.hstack((A1,A2))
 
     # Pack the patterns into presses that all look like this:
-    wr = [(25000, 16000) for _ in range(8)]
+    wr = [(25000, 16000) for _ in range(7)]
     waste, Lp = pack_n_press(A, data.orders, H, W, wr)
     print(waste)
     # Pack the patterns
