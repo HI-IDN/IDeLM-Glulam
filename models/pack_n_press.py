@@ -86,7 +86,7 @@ def pack_n_press(A, b, H, L, wr, debug=True):
         return None, None
 
     # extract the solution
-    Lp_ = np.zeros((len(K), len(R)))
+    Lp_ = np.zeros((len(K), len(R)))  # the length of the press
     Waste_ = np.zeros((len(K), len(R)))
     for k in K:
         for r in R:
@@ -97,17 +97,18 @@ def pack_n_press(A, b, H, L, wr, debug=True):
 
     # print the solution
     if debug == True:
-        print_results(A, b, K, R, I, J, H, L, Lp_, h, omega, Waste_, x, wr, delta)
+        print_press_results(K, R, Lp_, h, omega, Waste_)
+        print_item_results(A, b, K, R, I, J, H, L, x, wr, delta)
 
     # return all omega values
     return Waste_, Lp_
 
 
-def print_results(A, b, K, R, I, J, H, L, Lp_, h, omega, Waste_, x, wr, delta):
-    # Print the first table
-    print("\n\nTable 1: Press Information\n")
+def print_press_results(K, R, Lp_, h, omega, Waste_):
+    """ Print the information about the presses. """
+    print("\n\nTable: Press Information\n")
     row_format = "{:<5} {:>6} {:>6} {:>6} {:>6}"
-    header = ['Press', 'Width', 'Height', 'Waste', 'Waste']
+    header = ['Press', 'Width', 'Height', 'Waste', 'TotalWaste']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
@@ -119,31 +120,58 @@ def print_results(A, b, K, R, I, J, H, L, Lp_, h, omega, Waste_, x, wr, delta):
         print(seperator_major if k == 0 else seperator_minor)
         for r in R:
             press_info = [f'{k}.{r}', int(Lp_[k, r]), int(h[k, r].X / GlulamConfig.LAYER_HEIGHT),
-                          f"{omega[k, r].X / 1000 / 1000:.2f}", f"{Waste_[k, r]:.2f}"]
+                          f"{Waste_[k, r]:.2f}", f"{omega[k, r].X / 1000 / 1000:.2f}"]
             print(row_format.format(*press_info))
     print(seperator_major)
 
-    # Print the second table
+
+def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
+    """ Print the information about the items pressed. """
     print("\n\nTable 2: Item Information\n")
-    row_format = "{:<5} {:>4} {:>5} {:>3} {:>7} {:>4} {:>3} {:>5}"
+    row_format = "{:<5} {:>4} {:>8} {:>3} {:>7} {:>4} {:>3} {:>5}"
     header = ['Press', 'Item', 'Waste', 'Pat', 'Width', 'Used', 'Qty', 'Delta']
+    subheader = ['k.r', 'i', 'H(wr-L)x', 'j', 'L', 'xA', 'b', 'delta']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
 
     print(seperator_major)
     print(header)
+    print(row_format.format(*subheader))
+
+    def single_press_info(k, r):
+        if any([x[j, k, r].X > 0.1 for j in J]):
+            print(seperator_major if k == 0 and r == 0 else seperator_minor)
+        else:
+            return
+
+        # Initialize variables for total values
+        tot_item_used = tot_item_waste = 0
+        tot_items = set()
+        tot_patterns = set()
+
+        for j in J:
+            if x[j, k, r].X > 0.1:
+                for i in I:
+                    if A[i, j] > 0.1:
+                        item_waste = H[j] * (wr[k][r] - L[j]) * x[j, k, r].X / 1000 / 1000
+                        item_used = x[j, k, r].X * A[i, j]
+                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
+                                     int(item_used), b[i], f"{delta[i].X:.0f}"]
+                        print(row_format.format(*item_info))
+                        # Keep track of total values
+                        tot_items.add(i)
+                        tot_patterns.add(j)
+                        tot_item_used += item_used
+                        tot_item_waste += item_waste
+
+        # Print total values
+        item_info = ["==>", f"#{len(tot_items)}", f"={tot_item_waste:.2f}", f"#{len(tot_patterns)}", '-',
+                     f"#{tot_item_used:.0f}", '-', '-']
+        print(row_format.format(*item_info))
 
     for k in K:
         for r in R:
-            if any([x[j, k, r].X > 0.1 for j in J]):
-                print(seperator_major if k == 0 and r == 0 else seperator_minor)
-            for j in J:
-                if x[j, k, r].X > 0.1:
-                    for i in I:
-                        if A[i, j] > 0.1:
-                            item_waste = H[j] * (wr[k][r] - L[j]) * x[j, k, r].X / 1000 / 1000
-                            item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
-                                         int(x[j, k, r].X * A[i, j]), b[i], int(delta[i].X)]
-                            print(row_format.format(*item_info))
+            single_press_info(k, r)
+
     print(seperator_major)
