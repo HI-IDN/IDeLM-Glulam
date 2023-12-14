@@ -166,7 +166,9 @@ class GlulamPatternProcessor:
             # Add the new pattern to the matrix A
             A = np.hstack((self._A, new_pattern))
             H = np.concatenate((self._H, np.array([h.X])))
-            W = np.concatenate((self._W, np.array([use[i].X*self.data.widths[i] for i in self.I])))
+            tmp = np.array(np.sum([use[i].X*self.data.widths[i] for i in self.I])).flatten()
+            # print("debug: tmp=", tmp)
+            W = np.concatenate((self._W, tmp))
             return A, H, W, False
         else:
             # No more patterns with negative reduced cost, stop the process
