@@ -20,7 +20,7 @@ def main(file_path, depth):
     A = merged.A
 
     # Pack the patterns into presses that all look like this:
-    wr = [(25000, 16000) for _ in range(8)]
+    wr = [(25000, 16000) for _ in range(7)]
     waste, Lp = pack_n_press(A, data.quantity, H, W, wr)
     print(waste)
 
