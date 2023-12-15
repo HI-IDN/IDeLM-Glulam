@@ -26,6 +26,7 @@ class GlulamPatternProcessor:
         self._A = None
         self._H = None
         self._W = None
+        self._R = None
 
     @property
     def A(self):
@@ -51,6 +52,11 @@ class GlulamPatternProcessor:
     def W(self):
         """ Pattern total width """
         return self._W
+
+    @property
+    def R(self):
+        """ Roll width """
+        return self._R
 
     @property
     def m(self):
@@ -97,6 +103,7 @@ class GlulamPatternProcessor:
             self._A = np.zeros((self.data.m, self.data.m))
             self._H = np.zeros(self.data.m)
             self._W = np.zeros(self.data.m)
+            self._R = np.array([self.roll_width for _ in range(self.data.m)])
             for i in range(self.data.m):
                 self._A[i, i] = max(1, np.floor(self.roll_width / self.data.widths[i]))  # If roll width is less than
                 # item width, then no pattern is generated so force that pattern to be 1 (this is not an issue
@@ -123,6 +130,7 @@ class GlulamPatternProcessor:
             self._H = self._H[used_patterns_filter]
             self._W = self._W[used_patterns_filter]
             self._A = self._A[:, used_patterns_filter]
+            self._R = self._R[used_patterns_filter]
 
         # Initialize the pattern matrix and bailout flag
         _set_initial_pattern()
@@ -160,7 +168,7 @@ class GlulamPatternProcessor:
             filter_unused_patterns(x)
 
             # Solve the column generation sub problem
-            bailout = self._column_generation_subproblem(pi)            
+            bailout = self._column_generation_subproblem(pi)
 
         # Return the cutting frequencies
         return {j: x[j].X for j in self.J}
@@ -227,6 +235,10 @@ class GlulamPatternProcessor:
             W = np.array(np.sum([use[i].X * self.data.widths[i] for i in self.I])).flatten()
             # Append this total width to the W array. This adds the total width of the new pattern to the existing widths
             self._W = np.concatenate((self._W, W))
+
+            # Append the roll width to the R array
+            self._R = np.concatenate((self._R, np.array([self.roll_width])))
+
             return False
         else:
             # No more patterns with negative reduced cost, stop the process
@@ -259,11 +271,12 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
             print(f'#{i} {roll_width}mm: A is {pattern.A.shape} matrix')
 
             if self._A is None:
-                self._A, self._H, self._W = pattern.A, pattern.H, pattern.W
+                self._A, self._H, self._W, self._R = pattern.A, pattern.H, pattern.W, pattern.R
             else:
                 self._A = np.hstack((self._A, pattern.A))
                 self._H = np.concatenate((self._H, pattern.H))
                 self._W = np.concatenate((self._W, pattern.W))
+                self._R = np.concatenate((self._R, pattern.R))
 
         self._remove_duplicate_patterns()
         print(f'=> Combined A is {self.A.shape} matrix')

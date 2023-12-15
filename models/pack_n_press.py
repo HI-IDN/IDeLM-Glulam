@@ -4,7 +4,7 @@ import numpy as np
 from config.settings import GlulamConfig
 
 
-def pack_n_press(merged, wr, debug = True):
+def pack_n_press(merged, wr, debug=True):
     """
     Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
     1) to minimize the waste and 2) to minimize the difference between demand and supply.
@@ -21,11 +21,12 @@ def pack_n_press(merged, wr, debug = True):
     - Lp_ (np.array): The length of each press.
     - delta (np.array): The difference between demand and supply for each item.
     """
-    
+
     H = merged.H
     L = merged.W
     A = merged.A
     b = merged.b
+    RW = merged.R
 
     # parameters
     bigM = 100000000  # a big number
@@ -178,7 +179,8 @@ def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
                         item_waste = H[j] * (wr[k][r] - L[j]) * x[j, k, r].X / 1000 / 1000
                         item_used = x[j, k, r].X * A[i, j]
                         pattern_used = x[j, k, r].X
-                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]), int(H[j]/GlulamConfig.LAYER_HEIGHT),
+                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
+                                     int(H[j] / GlulamConfig.LAYER_HEIGHT),
                                      int(pattern_used), int(item_used), b[i], f"{delta[i].X:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
@@ -189,7 +191,7 @@ def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
 
         # Print total values
         item_info = ["==>", f"#{len(tot_items)}", f"={tot_item_waste:.2f}", f"#{len(tot_patterns)}", '-',
-                     f"#{tot_press_height:.0f}", '-','-','-','-']
+                     f"#{tot_press_height:.0f}", '-', '-', '-', '-']
         print(row_format.format(*item_info))
 
     for k in K:
