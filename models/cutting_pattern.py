@@ -24,16 +24,22 @@ class GlulamPatternProcessor:
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
 
         # The starting cutting patterns for each order
-        self._A = np.zeros((self.data.m, self.data.m))
-        self._H = np.zeros(self.data.m)
-        self._W = np.zeros(self.data.m)
-        self._R = np.array([roll_width for _ in range(self.data.m)])
+        self._A = np.zeros((self.data.m, self.data.m * 2))
+        self._H = np.zeros(self.data.m * 2)
+        self._W = np.zeros(self.data.m * 2)
         for i in range(self.data.m):
-            self._A[i, i] = max(1, np.floor(self.roll_width / self.data.widths[i]))  # If roll width is less than
-            # item width, then no pattern is generated so force that pattern to be 1 (this is not an issue
-            # because the demand b for that item is set 0)
+            self._A[i, i] = 1
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
+            self._R[i] = self.data.widths[i]
+        for i in range(self.data.m):
+            copies = np.floor(self.roll_width / self.data.widths[i])  # How many copies of the pattern can be made
+            copies = min(copies, self.data.quantity[i])  # Never make more copies of the pattern than the demand
+            copies = max(copies, 1)  # Make at least one copy of the pattern, even if the demand is 0
+            self._A[i, self.data.m + i] = copies
+            self._H[self.data.m + i] = self.data.heights[i]
+            self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
+            self._R[i] = self.data.widths[i] * copies
 
         # Final check to ensure all diagonal elements in A are greater than 0
         if not np.all(np.diag(self._A) > 0):
@@ -118,7 +124,7 @@ class GlulamPatternProcessor:
                 - x (gurobi.Var): Quantities for each pattern to be cut, a decision variable in cut_model problem.
             """
             # Create a filter for indices of patterns that are used (x[j] > 0)
-            used_patterns_filter = [j for j in self.J if x[j].X > 0.0000001]
+            used_patterns_filter = [j for j in self.J if x[j].X > 0.0000001 or j <= self.data.m]
 
             # Apply the filter to H, W, and A
             self._H = self._H[used_patterns_filter]
@@ -177,7 +183,6 @@ class GlulamPatternProcessor:
         """
         # A large number for big-M method in MIP
         bigM = 1000000
-        Delta = 50
 
         # Initialize the knapsack model
         knapmodel = gp.Model("Knapsack")
@@ -194,7 +199,8 @@ class GlulamPatternProcessor:
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
         knapmodel.addConstr(
-            gp.quicksum(self.data.widths[i] * use[i] for i in self.I) >= self.roll_width - Delta)  # Width limit
+            gp.quicksum(self.data.widths[i] * use[i] for i in
+                        self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
@@ -235,6 +241,21 @@ class GlulamPatternProcessor:
             # No more patterns with negative reduced cost, stop the process
             return True
 
+    def _remove_duplicate_patterns(self):
+        """
+        Removes duplicate patterns from the pattern matrix A, and corresponding entries in H and W arrays.
+        """
+        old_shape = self._A.shape
+
+        # Find unique patterns in A - keep indices and update corresponding arrays H, W and R
+        self._A, unique_indices = np.unique(self._A, axis=1, return_index=True)
+
+        self._H = self._H[unique_indices]
+        self._W = self._W[unique_indices]
+        self._R = self._R[unique_indices]
+
+        print(f'=> Combined A is {self.A.shape} matrix after removing duplicates (from {old_shape})')
+
 
 class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
     def __init__(self, data, roll_widths):
@@ -266,18 +287,3 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
 
         self._remove_duplicate_patterns()
         print(f'=> Combined A is {self.A.shape} matrix')
-
-    def _remove_duplicate_patterns(self):
-        """
-        Removes duplicate patterns from the pattern matrix A, and corresponding entries in H and W arrays.
-        """
-        old_shape = self._A.shape
-
-        # Find unique patterns in A - keep indices and update corresponding arrays H, W and R
-        self._A, unique_indices = np.unique(self._A, axis=1, return_index=True)
-
-        self._H = self._H[unique_indices]
-        self._W = self._W[unique_indices]
-        self._R = self._R[unique_indices]
-
-        print(f'=> Combined A is {self.A.shape} matrix after removing duplicates (from {old_shape})')
