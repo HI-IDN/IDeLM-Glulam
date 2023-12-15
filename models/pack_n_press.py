@@ -148,9 +148,9 @@ def print_item_only_results(b, I, H, L):
 def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
     """ Print the information about the items pressed. """
     print("\n\nTable 2: Item Information\n")
-    row_format = "{:<5} {:>4} {:>8} {:>3} {:>7} {:>4} {:>3} {:>5}"
-    header = ['Press', 'Item', 'Waste', 'Pat', 'Width', 'Used', 'Qty', 'Delta']
-    subheader = ['k.r', 'i', 'H(wr-L)x', 'j', 'L', 'xA', 'b', 'delta']
+    row_format = "{:<5} {:>4} {:>8} {:>3} {:>7} {:>4} {:>7} {:>4} {:>3} {:>5}"
+    header = ['Press', 'Item', 'Waste', 'Pat', 'Width', 'Height', '#Pat', 'Used', 'Qty', 'Delta']
+    subheader = ['k.r', 'i', 'H(wr-L)x', 'j', 'L', 'H', '#j', 'xA', 'b', 'delta']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
@@ -166,18 +166,20 @@ def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
             return
 
         # Initialize variables for total values
-        tot_item_used = tot_item_waste = 0
+        tot_item_used = tot_item_waste = tot_press_height = 0
         tot_items = set()
         tot_patterns = set()
 
         for j in J:
             if x[j, k, r].X > 0.1:
+                tot_press_height += x[j, k, r].X * H[j] / GlulamConfig.LAYER_HEIGHT
                 for i in I:
                     if A[i, j] > 0.1:
                         item_waste = H[j] * (wr[k][r] - L[j]) * x[j, k, r].X / 1000 / 1000
                         item_used = x[j, k, r].X * A[i, j]
-                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
-                                     int(item_used), b[i], f"{delta[i].X:.0f}"]
+                        pattern_used = x[j, k, r].X
+                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]), int(H[j]/GlulamConfig.LAYER_HEIGHT),
+                                     int(pattern_used), int(item_used), b[i], f"{delta[i].X:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
                         tot_items.add(i)
@@ -187,7 +189,7 @@ def print_item_results(A, b, K, R, I, J, H, L, x, wr, delta):
 
         # Print total values
         item_info = ["==>", f"#{len(tot_items)}", f"={tot_item_waste:.2f}", f"#{len(tot_patterns)}", '-',
-                     f"#{tot_item_used:.0f}", '-', '-']
+                     f"#{tot_press_height:.0f}", '-','-','-','-']
         print(row_format.format(*item_info))
 
     for k in K:
