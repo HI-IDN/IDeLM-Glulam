@@ -23,10 +23,21 @@ class GlulamPatternProcessor:
             assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
 
-        self._A = None
-        self._H = None
-        self._W = None
-        self._R = None
+        # The starting cutting patterns for each order
+        self._A = np.zeros((self.data.m, self.data.m))
+        self._H = np.zeros(self.data.m)
+        self._W = np.zeros(self.data.m)
+        self._R = np.array([roll_width for _ in range(self.data.m)])
+        for i in range(self.data.m):
+            self._A[i, i] = max(1, np.floor(self.roll_width / self.data.widths[i]))  # If roll width is less than
+            # item width, then no pattern is generated so force that pattern to be 1 (this is not an issue
+            # because the demand b for that item is set 0)
+            self._H[i] = self.data.heights[i]
+            self._W[i] = self.data.widths[i] * self._A[i, i]
+
+        # Final check to ensure all diagonal elements in A are greater than 0
+        if not np.all(np.diag(self._A) > 0):
+            raise ValueError("Invalid pattern matrix: Some diagonal elements in A are not greater than 0.")
 
     @property
     def A(self):
@@ -98,23 +109,6 @@ class GlulamPatternProcessor:
         - x (dict): Quantities for each pattern to be cut.
         """
 
-        def _set_initial_pattern():
-            """ Generates initial cutting patterns for each order, which just by cuts one item type per pattern. """
-            self._A = np.zeros((self.data.m, self.data.m))
-            self._H = np.zeros(self.data.m)
-            self._W = np.zeros(self.data.m)
-            self._R = np.array([self.roll_width for _ in range(self.data.m)])
-            for i in range(self.data.m):
-                self._A[i, i] = max(1, np.floor(self.roll_width / self.data.widths[i]))  # If roll width is less than
-                # item width, then no pattern is generated so force that pattern to be 1 (this is not an issue
-                # because the demand b for that item is set 0)
-                self._H[i] = self.data.heights[i]
-                self._W[i] = self.data.widths[i] * self._A[i, i]
-
-            # Final check to ensure all diagonal elements in A are greater than 0
-            if not np.all(np.diag(self._A) > 0):
-                raise ValueError("Invalid pattern matrix: Some diagonal elements in A are not greater than 0.")
-
         def filter_unused_patterns(x):
             """
             Removes unused patterns from the pattern matrix A, and corresponding entries in H and W arrays.
@@ -132,10 +126,7 @@ class GlulamPatternProcessor:
             self._A = self._A[:, used_patterns_filter]
             self._R = self._R[used_patterns_filter]
 
-        # Initialize the pattern matrix and bailout flag
-        _set_initial_pattern()
         bailout = False
-
         while not bailout:
             # Create the cutting model
             cut_model = gp.Model("Cutting")
@@ -262,21 +253,16 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         """
         Generates and combines patterns for each roll width.
         """
-        self._A, self._H, self._W = None, None, None
-
         print(f'Generating patterns for roll widths: {self.roll_widths}')
         for i, roll_width in enumerate(self.roll_widths):
             pattern = GlulamPatternProcessor(self.data, roll_width)
             pattern.cutting_stock_column_generation()
             print(f'#{i} {roll_width}mm: A is {pattern.A.shape} matrix')
 
-            if self._A is None:
-                self._A, self._H, self._W, self._R = pattern.A, pattern.H, pattern.W, pattern.R
-            else:
-                self._A = np.hstack((self._A, pattern.A))
-                self._H = np.concatenate((self._H, pattern.H))
-                self._W = np.concatenate((self._W, pattern.W))
-                self._R = np.concatenate((self._R, pattern.R))
+            self._A = np.hstack((self._A, pattern.A))
+            self._H = np.concatenate((self._H, pattern.H))
+            self._W = np.concatenate((self._W, pattern.W))
+            self._R = np.concatenate((self._R, pattern.R))
 
         self._remove_duplicate_patterns()
         print(f'=> Combined A is {self.A.shape} matrix')
