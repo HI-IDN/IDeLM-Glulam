@@ -287,15 +287,11 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         """
         old_shape = self._A.shape
 
-        # Combine A, H, and W into a single matrix
-        combined_matrix = np.column_stack((self._A.T, self._H, self._W))
+        # Find unique patterns in A - keep indices and update corresponding arrays H, W and R
+        self._A, unique_indices = np.unique(self._A, axis=1, return_index=True)
 
-        # Use numpy's unique function to find unique rows and their indices
-        unique_matrix, indices = np.unique(combined_matrix, axis=0, return_index=True)
-
-        # Extract the unique values back to A, H, W
-        self._A = unique_matrix[:, :-2].T  # All but the last two columns (and transpose to get back to original shape)
-        self._H = unique_matrix[:, -2]  # Second-to-last column
-        self._W = unique_matrix[:, -1]  # Last column
+        self._H = self._H[unique_indices]
+        self._W = self._W[unique_indices]
+        self._R = self._R[unique_indices]
 
         print(f'=> Combined A is {self.A.shape} matrix after removing duplicates (from {old_shape})')
