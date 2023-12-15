@@ -20,8 +20,11 @@ def main(file_path, depth):
     
     print(wr)
     # Generate cutting patterns
+    merged = ExtendedGlulamPatternProcessor(data)
     roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
-    merged = ExtendedGlulamPatternProcessor(data, roll_widths)
+    for roll_width in roll_widths:
+        merged.add_roll_width(roll_width)
+
     waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr)
     print(true_waste)
     print("total waste = ", np.sum(true_waste))

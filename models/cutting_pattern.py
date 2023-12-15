@@ -42,10 +42,6 @@ class GlulamPatternProcessor:
             self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
             self._R[i] = self.data.widths[i] * copies
 
-        # Final check to ensure all diagonal elements in A are greater than 0
-        if not np.all(np.diag(self._A) > 0):
-            raise ValueError("Invalid pattern matrix: Some diagonal elements in A are not greater than 0.")
-
     @property
     def A(self):
         """ Pattern matrix, a matrix of size m x n, where m is the number of orders and n is the number of patterns. """
@@ -246,7 +242,6 @@ class GlulamPatternProcessor:
         """
         Removes duplicate patterns from the pattern matrix A, and corresponding entries in H and W arrays.
         """
-        old_shape = self._A.shape
 
         # Find unique patterns in A - keep indices and update corresponding arrays H, W and R
         self._A, unique_indices = np.unique(self._A, axis=1, return_index=True)
@@ -255,36 +250,35 @@ class GlulamPatternProcessor:
         self._W = self._W[unique_indices]
         self._R = self._R[unique_indices]
 
-        print(f'=> Combined A is {self.A.shape} matrix after removing duplicates (from {old_shape})')
-
 
 class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
-    def __init__(self, data, roll_widths):
+    def __init__(self, data):
         """
-        Initializes the ExtendedGlulamPatternProcessor with the necessary data and multiple roll widths.
+        Initializes the ExtendedGlulamPatternProcessor with the necessary data.
 
         Parameters:
         - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
-        - roll_widths (list): A list of roll widths to generate patterns for.
         """
         super().__init__(data, roll_width=None)  # Initialize the base class
-        self.roll_widths = roll_widths
-        self._generate_and_combine_patterns()
 
-    def _generate_and_combine_patterns(self):
+    def add_roll_width(self, roll_width):
         """
-        Generates and combines patterns for each roll width.
+        Generates cutting patterns for the given roll width and adds them to the existing patterns.
         """
-        print(f'Generating patterns for roll widths: {self.roll_widths}')
-        for i, roll_width in enumerate(self.roll_widths):
-            pattern = GlulamPatternProcessor(self.data, roll_width)
-            pattern.cutting_stock_column_generation()
-            print(f'#{i} {roll_width}mm: A is {pattern.A.shape} matrix')
-
-            self._A = np.hstack((self._A, pattern.A))
-            self._H = np.concatenate((self._H, pattern.H))
-            self._W = np.concatenate((self._W, pattern.W))
-            self._R = np.concatenate((self._R, pattern.R))
-
+        pattern = GlulamPatternProcessor(self.data, roll_width)
+        pattern.cutting_stock_column_generation()
+        self._A = np.hstack((self._A, pattern.A))
+        self._H = np.concatenate((self._H, pattern.H))
+        self._W = np.concatenate((self._W, pattern.W))
+        self._R = np.concatenate((self._R, pattern.R))
         self._remove_duplicate_patterns()
-        print(f'=> Combined A is {self.A.shape} matrix')
+
+    def remove_roll_width(self, roll_width):
+        """
+        Removes cutting patterns for the given roll width from the existing patterns.
+        """
+        ix = np.where(self._R == roll_width)
+        self._A = np.delete(self._A, ix, axis=1)
+        self._H = np.delete(self._H, ix)
+        self._W = np.delete(self._W, ix)
+        self._R = np.delete(self._R, ix)
