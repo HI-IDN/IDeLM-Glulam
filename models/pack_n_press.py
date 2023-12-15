@@ -4,7 +4,7 @@ import numpy as np
 from config.settings import GlulamConfig
 
 
-def pack_n_press(merged, wr):
+def pack_n_press(merged, wr, debug = True):
     """
     Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
     1) to minimize the waste and 2) to minimize the difference between demand and supply.
@@ -21,7 +21,7 @@ def pack_n_press(merged, wr):
     - Lp_ (np.array): The length of each press.
     - delta (np.array): The difference between demand and supply for each item.
     """
-    debug = True
+    
     H = merged.H
     L = merged.W
     A = merged.A

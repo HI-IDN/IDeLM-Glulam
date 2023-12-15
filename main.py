@@ -13,16 +13,25 @@ def main(file_path, depth):
     data = GlulamDataProcessor(file_path, depth)
 
     # Pack the patterns into presses that all look like this:
-    wr = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
+    wr = [[GlulamConfig.MAX_ROLL_WIDTH_REGION[0]-np.random.choice(range(0,101,GlulamConfig.ROLL_WIDTH_TOLERANCE)),
+            GlulamConfig.MAX_ROLL_WIDTH_REGION[1]-np.random.choice(range(0,101,GlulamConfig.ROLL_WIDTH_TOLERANCE))] 
+            for _ in range(GlulamConfig.MAX_PRESSES)]
+    wr_ = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
+    
+    print(wr)
     # Generate cutting patterns
     roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
     merged = ExtendedGlulamPatternProcessor(data, roll_widths)
     waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr)
-    print(true_waste)
+    #print(true_waste)
+    print("total waste = ", np.sum(true_waste))
+    waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr_)
+    #print(true_waste)
+    print("total waste = ", np.sum(true_waste))
+
 
     # Optimize the press configuration
     # press_config = optimize_press_configuration()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glulam Production Optimizer")

@@ -205,6 +205,10 @@ class GlulamPatternProcessor:
         # Solve the knapsack problem
         knapmodel.optimize()
 
+        # Bailout if not feasible solution found
+        if knapmodel.status != gp.GRB.OPTIMAL:
+            return True
+
         # Check if a new pattern with negative reduced cost is found
         if knapmodel.objval < -0.0000001:
 
