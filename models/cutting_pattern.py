@@ -27,6 +27,7 @@ class GlulamPatternProcessor:
         self._A = np.zeros((self.data.m, self.data.m * 2))
         self._H = np.zeros(self.data.m * 2)
         self._W = np.zeros(self.data.m * 2)
+        self._R = np.zeros(self.data.m * 2)
         for i in range(self.data.m):
             self._A[i, i] = 1
             self._H[i] = self.data.heights[i]
@@ -123,7 +124,7 @@ class GlulamPatternProcessor:
             Parameters:
                 - x (gurobi.Var): Quantities for each pattern to be cut, a decision variable in cut_model problem.
             """
-            # Create a filter for indices of patterns that are used (x[j] > 0)
+            # Create a filter for indices of patterns that are used (x[j] > 0) and not lose the identity patterns
             used_patterns_filter = [j for j in self.J if x[j].X > 0.0000001 or j <= self.data.m]
 
             # Apply the filter to H, W, and A
