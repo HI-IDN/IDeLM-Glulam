@@ -22,7 +22,6 @@ class GlulamPatternProcessor:
             self.roll_width = roll_width
             assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
-
         # The starting cutting patterns for each order
         self._A = np.zeros((self.data.m, self.data.m * 2))
         self._H = np.zeros(self.data.m * 2)
@@ -32,7 +31,7 @@ class GlulamPatternProcessor:
             self._A[i, i] = 1
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
-            self._R[i] = self.data.widths[i]
+            self._R[i] = self._W[i] # this could also be rounded to discete values jumping on GlulamConfig.ROLL_WIDTH_TOLERANCE
         for i in range(self.data.m):
             copies = np.floor(self.roll_width / self.data.widths[i])  # How many copies of the pattern can be made
             copies = min(copies, self.data.quantity[i])  # Never make more copies of the pattern than the demand
@@ -40,7 +39,9 @@ class GlulamPatternProcessor:
             self._A[i, self.data.m + i] = copies
             self._H[self.data.m + i] = self.data.heights[i]
             self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
-            self._R[i] = self.data.widths[i] * copies
+            self._R[self.data.m + i] = self._W[self.data.m + i]
+            print("initial rollwidth", self.data.m + i, ":", self._R[self.data.m + i])
+        self._remove_duplicate_patterns()
 
     @property
     def A(self):
