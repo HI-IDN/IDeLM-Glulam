@@ -7,14 +7,13 @@ from models.pack_n_press import pack_n_press
 from config.settings import GlulamConfig
 import numpy as np
 
-
 def main(file_path, depth):
     # Load and process data
     data = GlulamDataProcessor(file_path, depth)
 
     # Pack the patterns into presses that all look like this:
-    wr = [[GlulamConfig.MAX_ROLL_WIDTH_REGION[0]-np.random.choice(range(0,101,GlulamConfig.ROLL_WIDTH_TOLERANCE)),
-            GlulamConfig.MAX_ROLL_WIDTH_REGION[1]-np.random.choice(range(0,101,GlulamConfig.ROLL_WIDTH_TOLERANCE))] 
+    wr = [[GlulamConfig.MAX_ROLL_WIDTH_REGION[0]-np.random.choice(range(0,201,GlulamConfig.ROLL_WIDTH_TOLERANCE)),
+            GlulamConfig.MAX_ROLL_WIDTH_REGION[1]+np.random.choice(range(0,201,GlulamConfig.ROLL_WIDTH_TOLERANCE))] 
             for _ in range(GlulamConfig.MAX_PRESSES)]
     wr_ = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
     
@@ -25,13 +24,12 @@ def main(file_path, depth):
     for roll_width in roll_widths:
         merged.add_roll_width(roll_width)
 
-    waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr)
-    print(true_waste)
-    print("total waste = ", np.sum(true_waste))
     waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr_)
     print(true_waste)
     print("total waste = ", np.sum(true_waste))
-
+    #waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr_)
+    #print(true_waste)
+    #print("total waste = ", np.sum(true_waste))
 
     # Optimize the press configuration
     # press_config = optimize_press_configuration()
