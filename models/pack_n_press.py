@@ -52,7 +52,8 @@ def pack_n_press(merged, nump, debug=True):
     Lp = pmodel.addVars(K, R)  # what is the length of the region
     z = pmodel.addVars(K, R, vtype=GRB.BINARY)  # is press k used in region r
     h1 = pmodel.addVars(K, vtype=GRB.BINARY)  # is height in press k region 0 less than 24 layers
-    
+    F = pmodel.addVars(J, K, R)
+
     # indicate if a pattern is used or not in press k region r
     pmodel.addConstrs(x1[j, k, r]*bigM >= x[j, k, r] for j in J for k in K for r in R)
 
@@ -90,12 +91,14 @@ def pack_n_press(merged, nump, debug=True):
     pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, r] * L[j] - (1-x1[i, k, r])*bigM - (1-x1[j, k, r])*bigM for i in I for j in J for r in R for k in K)
     # make sure that the length of region 0 is longer than region 1
     ####pmodel.addConstrs(Lp[k,0] >= Lp[k,1] - (1-z[k,1])*bigM for k in K)
-
+    pmodel.addConstrs((Lp[k,r] - L[j])*H[j] <= F[j,k,r] + (1-x1[j,k,r])*bigM for j in J for k in K for r in R)
     # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
-    pmodel.setObjective(gp.quicksum(Lp[k,r] for k in K for r in R), GRB.MINIMIZE)
-                      #gp.quicksum((Lp[k,r] - L[j])*x1[j,k,r] for j in J for k in K for r in R)
-                      #+ 1000*gp.quicksum(Lp[k,r] for k in K for r in R)
+    pmodel.setObjective(
+                      #gp.quicksum(Lp[k,r] for k in K for r in R
+                      #gp.quicksum((Lp[k,r] - L[j])*H[j]*x[j,k,r] for j in J for k in K for r in R)/1000./1000.
+                      gp.quicksum(F[j,k,r] for j in J for k in K for r in R)
                       #+ gp.quicksum(delta[k,r] for k in K for r in R)
+                      , GRB.MINIMIZE)
                       
 
     # solve the model
