@@ -189,7 +189,7 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
                         pattern_used = x[j, k, r].X
                         item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
                                      int(H[j] / GlulamConfig.LAYER_HEIGHT),
-                                     int(pattern_used), int(item_used), Lp[k,r].X, f"{RW[j]:.0f}"]
+                                     int(pattern_used), int(item_used), int(Lp[k,r].X), f"{RW[j]:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
                         tot_items.add(i)
