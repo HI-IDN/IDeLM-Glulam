@@ -11,7 +11,7 @@ class GlulamConfig:
     MAX_PRESSES = 6  # maximum number of presses
 
     # Cutting pattern settings
-    SURPLUS_LIMIT = 6  # in pieces
+    SURPLUS_LIMIT = .1  # in pieces
     ROLL_WIDTH_TOLERANCE = 100  # in mm
 
     # Other settings
