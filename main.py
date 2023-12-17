@@ -12,11 +12,15 @@ def main(file_path, depth):
     data = GlulamDataProcessor(file_path, depth)
 
     # generate initial roll widths, say ten different configurations
-    wr = [np.floor((16000 + np.random.randint(0, 9000))/GlulamConfig.ROLL_WIDTH_TOLERANCE)*GlulamConfig.ROLL_WIDTH_TOLERANCE
-                for i in range(10)]
-
+    wr = [25000] #, 17700, 18000, 18600, 20000, 22001, 23001, 23300, 23800]
+    for i in range(10):
+        wr.append(np.floor((16000 + np.random.randint(0, 9000))/GlulamConfig.ROLL_WIDTH_TOLERANCE)*GlulamConfig.ROLL_WIDTH_TOLERANCE)
+ 
     # Generate cutting patterns
     merged = ExtendedGlulamPatternProcessor(data)
+
+    print(np.sort(merged.R))
+
     roll_widths = [int(wr_) for wr_ in wr]
     for roll_width in roll_widths:
         merged.add_roll_width(roll_width)
