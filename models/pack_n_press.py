@@ -88,7 +88,7 @@ def pack_n_press(merged, nump, debug=True):
     pmodel.addConstrs(Lp[k,r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
     # make sure that all pattern length in region 1 are smaller than those in region 0
-    pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, r] * L[j] - (1-x1[i, k, r])*bigM - (1-x1[j, k, r])*bigM for i in I for j in J for r in R for k in K)
+    pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, 1] * L[j] - (1-x1[i, k, 0])*bigM - (1-x1[j, k, 1])*bigM for i in I for j in J for k in K)
     # make sure that the length of region 0 is longer than region 1
     ####pmodel.addConstrs(Lp[k,0] >= Lp[k,1] - (1-z[k,1])*bigM for k in K)
     pmodel.addConstrs((Lp[k,r] - L[j])*H[j] / 1000. / 1000.  <= F[j,k,r] + (1-x1[j,k,r])*bigM for j in J for k in K for r in R)
