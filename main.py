@@ -11,38 +11,39 @@ def main(file_path, depth):
     # Load and process data
     data = GlulamDataProcessor(file_path, depth)
 
-    # Pack the patterns into presses that all look like this:         
-    #wr_ = [GlulamConfig.MAX_ROLL_WIDTH_REGION for _ in range(GlulamConfig.MAX_PRESSES)]
-
-    #wr = [[GlulamConfig.MAX_ROLL_WIDTH_REGION[0]-i*GlulamConfig.ROLL_WIDTH_TOLERANCE] 
-    #        for i in range(len(GlulamConfig.MAX_ROLL_WIDTH_REGION)*GlulamConfig.MAX_PRESSES)]
-    wr = [[np.floor((16000 + np.random.randint(0, 9000))/GlulamConfig.ROLL_WIDTH_TOLERANCE)*GlulamConfig.ROLL_WIDTH_TOLERANCE]
+    # generate initial roll widths, say ten different configurations
+    wr = [np.floor((16000 + np.random.randint(0, 9000))/GlulamConfig.ROLL_WIDTH_TOLERANCE)*GlulamConfig.ROLL_WIDTH_TOLERANCE
                 for i in range(10)]
-    # randomly generate we between 16000 and 25000 in the discretization of ROLL_WIDTH_TOLERANCE
-
-    print(wr)
-
 
     # Generate cutting patterns
     merged = ExtendedGlulamPatternProcessor(data)
-    roll_widths = list(set(roll_width for configuration in wr for roll_width in configuration))
-    for roll_width in roll_widths[:2]:
+    roll_widths = [int(wr_) for wr_ in wr]
+    for roll_width in roll_widths:
         merged.add_roll_width(roll_width)
 
     number_of_presses = int(GlulamConfig.MAX_PRESSES) - 1
     success = False
     while success == False:
         number_of_presses += 1
-        success, waste, Lp = pack_n_press(merged, number_of_presses)
+        success, waste, Lp, used_roll_widths, count_roll_widths = pack_n_press(merged, number_of_presses)
+
+    # summarize how many and which rolls are used
+    print("A.shape=", merged.A.shape)
+    print(roll_widths)
+    for i in range(len(roll_widths)):
+        rw = roll_widths[i]
+        if rw not in used_roll_widths:
+            print("rollwidth ", rw, " is not used, remove it from the list of rollwidths")
+            merged.remove_roll_width(rw)
+            print("A.shape=", merged.A.shape)
+            # removing rollwidths from the list of rollwidths
+            roll_widths[i] = -roll_widths[i]
+    print(roll_widths)
+    print(used_roll_widths)
+    print(count_roll_widths)
 
     print(waste)
     print("total waste = ", np.sum(waste))
-    #waste, true_waste, number_of_presses, Lp, delta = pack_n_press(merged, wr_)
-    #print(true_waste)
-    #print("total waste = ", np.sum(true_waste))
-
-    # Optimize the press configuration
-    # press_config = optimize_press_configuration()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glulam Production Optimizer")

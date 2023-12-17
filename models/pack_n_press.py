@@ -58,21 +58,21 @@ def pack_n_press(merged, nump, debug=True):
     pmodel.addConstrs(x1[j, k, r]*bigM >= x[j, k, r] for j in J for k in K for r in R)
 
     # compute height of each region
-    pmodel.addConstrs(gp.quicksum(H[j] * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
+    pmodel.addConstrs(gp.quicksum((H[j]/45.0) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
     # the total height of the region must be less than the maximum height of the press
     pmodel.addConstrs(
-        gp.quicksum(h[k, r] for r in R) <= GlulamConfig.MAX_HEIGHT_LAYERS * GlulamConfig.LAYER_HEIGHT for k in K)
+        gp.quicksum(h[k, r] for r in R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in K)
     
     # h[k,0] is the height of the R0 in press k, and we must make sure that it is at least the minimum height
     pmodel.addConstrs(
         h[k, 0] >=
-        GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] * GlulamConfig.LAYER_HEIGHT - (1 - z[k,0]) * bigM for k in K[:-1])
+        GlulamConfig.MIN_HEIGHT_LAYER_REGION[0]  - (1 - z[k,0]) * bigM for k in K[:-1])
 
     # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
     # and R1 is at least the minimum height for R1.
     pmodel.addConstrs(
         gp.quicksum(h[k, r] for r in R) >=
-        GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] * GlulamConfig.LAYER_HEIGHT - (1-z[k,0])*bigM for k in K[:-1])
+        GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1-z[k,0])*bigM for k in K[:-1])
     pmodel.addConstrs(gp.quicksum(x[j, k, 0] for j in J) >= z[k,1] for k in K) # if region 1 is used then region 0 is used
 
     # if the press is not used the x must be zero
@@ -83,7 +83,7 @@ def pack_n_press(merged, nump, debug=True):
 
     # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
     # h1[k] will indicate that the height of region 0 is less than 24 layers
-    pmodel.addConstrs(h1[k] <= (24000 - h[k,0])/24000 for j in J for k in K[:-1])
+    pmodel.addConstrs(h1[k] <= (24 - h[k,0])/24 for j in J for k in K[:-1])
     pmodel.addConstrs(Lp[k,r] >= 16000 - h1[k]*bigM - (1-z[k,1])*bigM for j in J for r in R for k in K[:-1])
     pmodel.addConstrs(Lp[k,r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
@@ -107,7 +107,10 @@ def pack_n_press(merged, nump, debug=True):
     # see if model is infeasible
     if pmodel.status == GRB.INFEASIBLE:
         print("The model is infeasible; quitting, increase number of presses")
-        return False, None, None
+        return False, None, None, None, None
+    # extract rollwidths used
+    RW_used = [RW[j] for j in J  for k in K for r in R if x[j, k, r].X > 0.1]
+    RW_used, RW_counts = np.unique(RW_used, return_counts=True)
 
     # extract the solution
     Lp_ = np.zeros((len(K), len(R)))  # the length of the press
@@ -121,11 +124,10 @@ def pack_n_press(merged, nump, debug=True):
   # print the solution
     if debug == True:
         print_press_results(K, R, Lp_, h, Waste_)
-        print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW)
-        print_item_only_results(b, I, H, L)
+        print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW, h)
  
     # return all omega values
-    return True, Waste_, Lp_
+    return True, Waste_, Lp_, RW_used, RW_counts
 
 
 def print_press_results(K, R, Lp_, h, Waste_):
@@ -143,23 +145,17 @@ def print_press_results(K, R, Lp_, h, Waste_):
     for k in K:
         print(seperator_major if k == 0 else seperator_minor)
         for r in R:
-            press_info = [f'{k}.{r}', int(Lp_[k, r]), int(h[k, r].X / GlulamConfig.LAYER_HEIGHT),
+            press_info = [f'{k}.{r}', int(Lp_[k, r]), int(h[k, r].X),
                           f"{Waste_[k, r]:.2f}"]
             print(row_format.format(*press_info))
     print(seperator_major)
 
-
-def print_item_only_results(b, I, H, L):
-    for i in I:
-        print("item", i, "width", L[i], "height", H[i], "demand", b[i])
-
-
-def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
+def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW, h):
     """ Print the information about the items pressed. """
     print("\n\nTable 2: Item Information\n")
-    row_format = "{:<5} {:>4} {:>8} {:>3} {:>7} {:>4} {:>7} {:>4} {:>3} {:>5}"
-    header = ['Press', 'Item', 'Waste', 'Pat', 'Width', 'Height', '#Pat', 'Used', 'Len', 'Rollwidth']
-    subheader = ['k.r', 'i', 'H(Lp-L)x', 'j', 'L', 'H', '#j', 'xA', 'Lp', 'Rw']
+    row_format = "{:<5} {:>4} {:>4} {:>8} {:>4} {:>7} {:>4} {:>7} {:>4} {:>4} {:>5}"
+    header = ['Press', 'Item', 'Order', 'Waste', 'Pat', 'Width', 'Height', '#Pat', 'Used', 'Len', 'Rollwidth']
+    subheader = ['k.r', 'i', 'b[i]', 'H(Lp-L)x', 'j', 'L', 'H', '#j', 'xA', 'Lp', 'Rw']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
@@ -175,20 +171,22 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
             return
 
         # Initialize variables for total values
-        tot_item_used = tot_item_waste = tot_press_height = 0
+        tot_item_used = 0
+        tot_item_waste = 0
+        tot_press_height = 0
         tot_items = set()
         tot_patterns = set()
 
         for j in J:
             if x[j, k, r].X > 0.1:
-                tot_press_height += x[j, k, r].X * H[j] / GlulamConfig.LAYER_HEIGHT
+                tot_press_height += np.round(x[j, k, r].X) * H[j] / 45.0
                 for i in I:
                     if A[i, j] > 0.1:
-                        item_waste = H[j] * (Lp[k,r].X - L[j]) * x[j, k, r].X / 1000 / 1000
-                        item_used = x[j, k, r].X * A[i, j]
-                        pattern_used = x[j, k, r].X
-                        item_info = [f"{k}.{r}", i, f"{item_waste:.2f}", j, int(L[j]),
-                                     int(H[j] / GlulamConfig.LAYER_HEIGHT),
+                        item_waste = H[j] * (Lp[k,r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
+                        item_used = np.round(x[j, k, r].X) * A[i, j]
+                        pattern_used = np.round(x[j, k, r].X)
+                        item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, int(L[j]),
+                                     int(H[j]/45.0),
                                      int(pattern_used), int(item_used), int(Lp[k,r].X), f"{RW[j]:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
@@ -198,7 +196,7 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
                         tot_item_waste += item_waste
 
         # Print total values
-        item_info = ["==>", f"#{len(tot_items)}", f"={tot_item_waste:.2f}", f"#{len(tot_patterns)}", '-',
+        item_info = ["==>", f"#{len(tot_items)}", '-', f"={tot_item_waste:.2f}", f"#{len(tot_patterns)}", '-',
                      f"#{tot_press_height:.0f}", '-', '-', '-', '-']
         print(row_format.format(*item_info))
 
