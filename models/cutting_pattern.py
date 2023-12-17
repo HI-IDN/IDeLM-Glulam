@@ -40,7 +40,7 @@ class GlulamPatternProcessor:
             self._H[self.data.m + i] = self.data.heights[i]
             self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
             self._R[self.data.m + i] = self._W[self.data.m + i]
-            print("initial rollwidth", self.data.m + i, ":", self._R[self.data.m + i])
+            #print("initial rollwidth", self.data.m + i, ":", self._R[self.data.m + i])
         self._remove_duplicate_patterns()
 
     @property
@@ -122,7 +122,7 @@ class GlulamPatternProcessor:
                 - x (gurobi.Var): Quantities for each pattern to be cut, a decision variable in cut_model problem.
             """
             # Create a filter for indices of patterns that are used (x[j] > 0) and not lose the identity patterns
-            used_patterns_filter = [j for j in self.J if x[j].X > 0.0000001 or j <= self.data.m]
+            used_patterns_filter = [j for j in self.J if x[j].X >= 0.0000001 or j <= 2*self.data.m]
 
             # Apply the filter to H, W, and A
             self._H = self._H[used_patterns_filter]
@@ -160,7 +160,7 @@ class GlulamPatternProcessor:
                 pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]
 
             # Remove columns in A[:,:] corresponding to x[j] = 0
-            filter_unused_patterns(x)
+            # filter_unused_patterns(x)
 
             # Solve the column generation sub problem
             bailout = self._column_generation_subproblem(pi)
@@ -196,9 +196,9 @@ class GlulamPatternProcessor:
 
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
-        knapmodel.addConstr(
-            gp.quicksum(self.data.widths[i] * use[i] for i in
-                        self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
+        #knapmodel.addConstr(
+        #    gp.quicksum(self.data.widths[i] * use[i] for i in
+        #                self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
