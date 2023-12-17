@@ -12,7 +12,7 @@ class GlulamConfig:
 
     # Cutting pattern settings
     SURPLUS_LIMIT = 6  # in pieces
-    ROLL_WIDTH_TOLERANCE = 50  # in mm
+    ROLL_WIDTH_TOLERANCE = 100  # in mm
 
     # Other settings
     DEFAULT_DEPTH = 115  # in mm

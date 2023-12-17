@@ -196,9 +196,9 @@ class GlulamPatternProcessor:
 
         # Width constraint: Total width used must not exceed roll width
         knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
-        #knapmodel.addConstr(
-        #    gp.quicksum(self.data.widths[i] * use[i] for i in
-        #                self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
+        knapmodel.addConstr(
+            gp.quicksum(self.data.widths[i] * use[i] for i in
+                        self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
 
         # Indicator constraints for height limits
         knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
