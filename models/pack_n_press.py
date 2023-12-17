@@ -91,7 +91,7 @@ def pack_n_press(merged, nump, debug=True):
     #pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, 1] * L[j] - (1-x1[i, k, 0])*bigM - (1-x1[j, k, 1])*bigM for i in I for j in J for k in K)
     # make sure that the length of region 0 is longer than region 1
     pmodel.addConstrs(Lp[k,0] >= Lp[k,1] - (1-z[k,1])*bigM for k in K)
-    pmodel.addConstrs((Lp[k,r] - L[j])*H[j] / 1000. / 1000.  <= F[j,k,r] + (1-x1[j,k,r])*bigM for j in J for k in K for r in R)
+    pmodel.addConstrs((Lp[k,r] - L[j])*H[j] <= F[j,k,r] + (1-x1[j,k,r])*bigM for j in J for k in K for r in R)
     # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
     pmodel.setObjective(
                       #gp.quicksum(Lp[k,r] for k in K for r in R
@@ -124,7 +124,7 @@ def pack_n_press(merged, nump, debug=True):
   # print the solution
     if debug == True:
         print_press_results(K, R, Lp_, h, Waste_)
-        print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW, h)
+        print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW)
  
     # return all omega values
     return True, Waste_, Lp_, RW_used, RW_counts
@@ -145,17 +145,17 @@ def print_press_results(K, R, Lp_, h, Waste_):
     for k in K:
         print(seperator_major if k == 0 else seperator_minor)
         for r in R:
-            press_info = [f'{k}.{r}', int(Lp_[k, r]), int(h[k, r].X),
+            press_info = [f'{k}.{r}', np.round(Lp_[k, r]), np.round(h[k, r].X),
                           f"{Waste_[k, r]:.2f}"]
             print(row_format.format(*press_info))
     print(seperator_major)
 
-def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW, h):
+def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
     """ Print the information about the items pressed. """
     print("\n\nTable 2: Item Information\n")
     row_format = "{:<5} {:>4} {:>4} {:>8} {:>4} {:>7} {:>4} {:>7} {:>4} {:>4} {:>5}"
     header = ['Press', 'Item', 'Order', 'Waste', 'Pat', 'Width', 'Height', '#Pat', 'Used', 'Len', 'Rollwidth']
-    subheader = ['k.r', 'i', 'b[i]', 'H(Lp-L)x', 'j', 'L', 'H', '#j', 'xA', 'Lp', 'Rw']
+    subheader = ['k.r', 'i', 'b[i]', 'H(Lp-L)x', 'j', 'L', 'H (rep)', '#j', '#j x A', 'Lp', 'Rw']
     header = row_format.format(*header)
     seperator_minor = '-' * len(header)
     seperator_major = '=' * len(header)
@@ -185,9 +185,9 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW, h):
                         item_waste = H[j] * (Lp[k,r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
                         item_used = np.round(x[j, k, r].X) * A[i, j]
                         pattern_used = np.round(x[j, k, r].X)
-                        item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, int(L[j]),
-                                     int(H[j]/45.0),
-                                     int(pattern_used), int(item_used), int(Lp[k,r].X), f"{RW[j]:.0f}"]
+                        item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, L[j],
+                                     np.round(H[j]/45.0),
+                                     pattern_used, item_used, np.round(Lp[k,r].X), f"{RW[j]:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
                         tot_items.add(i)
