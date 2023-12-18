@@ -55,25 +55,26 @@ def pack_n_press(merged, nump, debug=True):
     F = pmodel.addVars(J, K, R)
 
     # indicate if a pattern is used or not in press k region r
-    pmodel.addConstrs(x1[j, k, r]*bigM >= x[j, k, r] for j in J for k in K for r in R)
+    pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
 
     # compute height of each region
-    pmodel.addConstrs(gp.quicksum((H[j]/45.0) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
+    pmodel.addConstrs(gp.quicksum((H[j] / 45.0) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
     # the total height of the region must be less than the maximum height of the press
     pmodel.addConstrs(
         gp.quicksum(h[k, r] for r in R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in K)
-    
+
     # h[k,0] is the height of the R0 in press k, and we must make sure that it is at least the minimum height
     pmodel.addConstrs(
         h[k, 0] >=
-        GlulamConfig.MIN_HEIGHT_LAYER_REGION[0]  - (1 - z[k,0]) * bigM for k in K[:-1])
+        GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in K[:-1])
 
     # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
     # and R1 is at least the minimum height for R1.
     pmodel.addConstrs(
         gp.quicksum(h[k, r] for r in R) >=
-        GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1-z[k,0])*bigM for k in K[:-1])
-    pmodel.addConstrs(gp.quicksum(x[j, k, 0] for j in J) >= z[k,1] for k in K) # if region 1 is used then region 0 is used
+        GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in K[:-1])
+    pmodel.addConstrs(
+        gp.quicksum(x[j, k, 0] for j in J) >= z[k, 1] for k in K)  # if region 1 is used then region 0 is used
 
     # if the press is not used the x must be zero
     pmodel.addConstrs(x[j, k, r] <= bigM * z[k, r] for j in J for k in K for r in R)
@@ -83,23 +84,23 @@ def pack_n_press(merged, nump, debug=True):
 
     # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
     # h1[k] will indicate that the height of region 0 is less than 24 layers
-    pmodel.addConstrs(h1[k] <= (24 - h[k,0])/24 for j in J for k in K[:-1])
-    pmodel.addConstrs(Lp[k,r] >= 16000 - h1[k]*bigM - (1-z[k,1])*bigM for j in J for r in R for k in K[:-1])
-    pmodel.addConstrs(Lp[k,r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
+    pmodel.addConstrs(h1[k] <= (24 - h[k, 0]) / 24 for j in J for k in K[:-1])
+    pmodel.addConstrs(Lp[k, r] >= 16000 - h1[k] * bigM - (1 - z[k, 1]) * bigM for j in J for r in R for k in K[:-1])
+    pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
     # make sure that all pattern length in region 1 are smaller than those in region 0
-    #pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, 1] * L[j] - (1-x1[i, k, 0])*bigM - (1-x1[j, k, 1])*bigM for i in I for j in J for k in K)
+    # pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, 1] * L[j] - (1-x1[i, k, 0])*bigM - (1-x1[j, k, 1])*bigM for i in I for j in J for k in K)
     # make sure that the length of region 0 is longer than region 1
-    pmodel.addConstrs(Lp[k,0] >= Lp[k,1] - (1-z[k,1])*bigM for k in K)
-    pmodel.addConstrs((Lp[k,r] - L[j])*H[j] <= F[j,k,r] + (1-x1[j,k,r])*bigM for j in J for k in K for r in R)
+    pmodel.addConstrs(Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in K)
+    pmodel.addConstrs(
+        (Lp[k, r] - L[j]) * H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM for j in J for k in K for r in R)
     # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
     pmodel.setObjective(
-                      #gp.quicksum(Lp[k,r] for k in K for r in R
-                      #gp.quicksum((Lp[k,r] - L[j])*H[j]*x[j,k,r] for j in J for k in K for r in R)/1000./1000.
-                      gp.quicksum(F[j,k,r] for j in J for k in K for r in R)
-                      #+ gp.quicksum(delta[k,r] for k in K for r in R)
-                      , GRB.MINIMIZE)
-                      
+        # gp.quicksum(Lp[k,r] for k in K for r in R
+        # gp.quicksum((Lp[k,r] - L[j])*H[j]*x[j,k,r] for j in J for k in K for r in R)/1000./1000.
+        gp.quicksum(F[j, k, r] for j in J for k in K for r in R)
+        # + gp.quicksum(delta[k,r] for k in K for r in R)
+        , GRB.MINIMIZE)
 
     # solve the model
     pmodel.optimize()
@@ -109,7 +110,7 @@ def pack_n_press(merged, nump, debug=True):
         print("The model is infeasible; quitting, increase number of presses")
         return False, None, None, None, None
     # extract rollwidths used
-    RW_used = [RW[j] for j in J  for k in K for r in R if x[j, k, r].X > 0.1]
+    RW_used = [RW[j] for j in J for k in K for r in R if x[j, k, r].X > 0.1]
     RW_used, RW_counts = np.unique(RW_used, return_counts=True)
 
     # extract the solution
@@ -117,15 +118,15 @@ def pack_n_press(merged, nump, debug=True):
     Waste_ = np.zeros((len(K), len(R)))
     for k in K:
         for r in R:
-          for j in J:
-              if x[j, k, r].X > 0.1:
-                  Lp_[k, r] = int(max(Lp_[k, r], L[j]))
-                  Waste_[k, r] += H[j] * (Lp[k, r].X - L[j]) * x[j, k, r].X / 1000 / 1000  # convert to m^2
-  # print the solution
+            for j in J:
+                if x[j, k, r].X > 0.1:
+                    Lp_[k, r] = int(max(Lp_[k, r], L[j]))
+                    Waste_[k, r] += H[j] * (Lp[k, r].X - L[j]) * x[j, k, r].X / 1000 / 1000  # convert to m^2
+    # print the solution
     if debug == True:
         print_press_results(K, R, Lp_, h, Waste_)
         print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW)
- 
+
     # return all omega values
     return True, Waste_, Lp_, RW_used, RW_counts
 
@@ -150,10 +151,11 @@ def print_press_results(K, R, Lp_, h, Waste_):
             print(row_format.format(*press_info))
     print(seperator_major)
 
+
 def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
     """ Print the information about the items pressed. """
     print("\n\nTable 2: Item Information\n")
-    row_format = "{:<5} {:>4} {:>4} {:>8} {:>4} {:>7} {:>4} {:>7} {:>4} {:>4} {:>5}"
+    row_format = "{:<5} {:>4} {:>4} {:>8} {:>4} {:>7} {:>4} {:>7} {:>5} {:>5} {:>9}"
     header = ['Press', 'Item', 'Order', 'Waste', 'Pat', 'Width', 'Height', '#Pat', 'Used', 'Len', 'Rollwidth']
     subheader = ['k.r', 'i', 'b[i]', 'H(Lp-L)x', 'j', 'L', 'H (rep)', '#j', '#j x A', 'Lp', 'Rw']
     header = row_format.format(*header)
@@ -182,12 +184,12 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
                 tot_press_height += np.round(x[j, k, r].X) * H[j] / 45.0
                 for i in I:
                     if A[i, j] > 0.1:
-                        item_waste = H[j] * (Lp[k,r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
+                        item_waste = H[j] * (Lp[k, r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
                         item_used = np.round(x[j, k, r].X) * A[i, j]
                         pattern_used = np.round(x[j, k, r].X)
                         item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, L[j],
-                                     np.round(H[j]/45.0),
-                                     pattern_used, item_used, np.round(Lp[k,r].X), f"{RW[j]:.0f}"]
+                                     np.round(H[j] / 45.0),
+                                     pattern_used, item_used, np.round(Lp[k, r].X), f"{RW[j]:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
                         tot_items.add(i)
