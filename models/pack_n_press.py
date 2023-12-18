@@ -27,6 +27,7 @@ def pack_n_press(merged, nump, debug=True):
     A = merged.A
     b = merged.b
     RW = merged.R
+    #O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
 
     # parameters
     bigM = 100000000  # a big number
@@ -38,6 +39,8 @@ def pack_n_press(merged, nump, debug=True):
     J = range(A.shape[1])  # cutting patterns
     K = range(nump)  # presses
     R = range(len(GlulamConfig.MIN_HEIGHT_LAYER_REGION))  # regions
+  
+    #C = range(O.shape[1])  # list of customers
 
     # model and solve parameters
     print("pack'n'press...")
@@ -53,6 +56,8 @@ def pack_n_press(merged, nump, debug=True):
     z = pmodel.addVars(K, R, vtype=GRB.BINARY)  # is press k used in region r
     h1 = pmodel.addVars(K, vtype=GRB.BINARY)  # is height in press k region 0 less than 24 layers
     F = pmodel.addVars(J, K, R)
+    #Cp = pmodel.addVars(K,C)
+    #Ci = pmodel.addVars(K,C, vtype=GRB.BINARY)
 
     # indicate if a pattern is used or not in press k region r
     pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
@@ -75,6 +80,11 @@ def pack_n_press(merged, nump, debug=True):
         GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in K[:-1])
     pmodel.addConstrs(
         gp.quicksum(x[j, k, 0] for j in J) >= z[k, 1] for k in K)  # if region 1 is used then region 0 is used
+
+    # is customer with product in this press and then how many?
+    #pmodel.addConstrs(Cp[k,c] == gp.quicksum(x[j, k, r]*A[i,j]*O[i,c] for j in J for r in R) for k in K for c in C)
+    # indicator if Cp is larger than zero
+    #pmodel.addConstrs(Ci[k,c]*bigM >= Cp[k,c] for k in K for c in C)
 
     # if the press is not used the x must be zero
     pmodel.addConstrs(x[j, k, r] <= bigM * z[k, r] for j in J for k in K for r in R)
