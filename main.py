@@ -21,7 +21,7 @@ def main(file_path, depth):
     # Generate cutting patterns
     merged = ExtendedGlulamPatternProcessor(data)
 
-    print(np.sort(merged.R))
+    print(np.sort(merged.RW))
 
     roll_widths = [int(wr_) for wr_ in wr]
     for roll_width in roll_widths:
