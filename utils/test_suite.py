@@ -98,7 +98,7 @@ class TestGlulamPackagingProcessor(unittest.TestCase):
         success, obj_val = test_pack_n_press(self.pattern, 7, 180)
         self.assertTrue(success, "Seven presses are enough")
         self.assertTrue(round(obj_val) <= 178920)
-        success, obj_val = test_pack_n_press(self.pattern, 6, 420)
+        success, obj_val = test_pack_n_press(self.pattern, 6, 300)
         self.assertTrue(success, "Six presses are enough")
         self.assertTrue(round(obj_val) <= 52470)
 
