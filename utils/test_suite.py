@@ -66,7 +66,7 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.assertTrue(pattern.A.shape == (pattern.m, pattern.n), "A should be a m x n matrix.")
         self.assertTrue(pattern.H.shape == (pattern.n,), "H should be a n x 1 vector.")
         self.assertTrue(pattern.W.shape == (pattern.n,), "W should be a n x 1 vector.")
-        self.assertTrue(pattern.RW.shape == (pattern.n,), "R should be a n x 1 vector.")
+        self.assertTrue(pattern.RW.shape == (pattern.n,), "RW should be a n x 1 vector.")
 
     def test_A(self):
         self.check_AHWR(self.pattern)

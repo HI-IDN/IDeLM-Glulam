@@ -49,13 +49,27 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
     pmodel.setParam('TimeLimit', time_limit)
 
     # decision variables
-    x = pmodel.addVars(J, K, R, vtype=GRB.INTEGER)  # number of times pattern j is used in press k and region r
-    x1 = pmodel.addVars(J, K, R, vtype=GRB.BINARY)  # is pattern j used in press k and region r
-    h = pmodel.addVars(K, R)  # what is the height of the region
-    Lp = pmodel.addVars(K, R)  # what is the length of the region
-    z = pmodel.addVars(K, R, vtype=GRB.BINARY)  # is press k used in region r
-    h1 = pmodel.addVars(K, vtype=GRB.BINARY)  # is height in press k region 0 less than 24 layers
+    x = pmodel.addVars(J, K, R, vtype=GRB.INTEGER)
+    """ The number of times pattern j is used in press k and region r. """
+
+    x1 = pmodel.addVars(J, K, R, vtype=GRB.BINARY)
+    """ Whether pattern j is used in press k and region r."""
+
+    h = pmodel.addVars(K, R)
+    """ The height of each region. """
+
+    Lp = pmodel.addVars(K, R)
+    """ The length of each region. """
+
+    z = pmodel.addVars(K, R, vtype=GRB.BINARY)
+    """ Whether press k is used in region r. """
+
+    h1 = pmodel.addVars(K, vtype=GRB.BINARY)
+    """ Whether the height of region 0 in press k is less than MIN_HEIGHT_LAYER_REGION layers (i.e. 24 layers)."""
+
     F = pmodel.addVars(J, K, R)
+    """ The surplus of pattern j in press k and region r. """
+
     # Cp = pmodel.addVars(K,C)
     # Ci = pmodel.addVars(K,C, vtype=GRB.BINARY)
 
@@ -63,7 +77,8 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
     pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
 
     # compute height of each region
-    pmodel.addConstrs(gp.quicksum((H[j] / 45.0) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
+    pmodel.addConstrs(
+        gp.quicksum((H[j] / GlulamConfig.LAYER_HEIGHT) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
     # the total height of the region must be less than the maximum height of the press
     pmodel.addConstrs(
         gp.quicksum(h[k, r] for r in R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in K)
@@ -94,8 +109,12 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
 
     # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
     # h1[k] will indicate that the height of region 0 is less than 24 layers
-    pmodel.addConstrs(h1[k] <= (24 - h[k, 0]) / 24 for j in J for k in K[:-1])
-    pmodel.addConstrs(Lp[k, r] >= 16000 - h1[k] * bigM - (1 - z[k, 1]) * bigM for j in J for r in R for k in K[:-1])
+    pmodel.addConstrs(
+        h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
+        for j in J for k in K[:-1])
+    pmodel.addConstrs(
+        Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
+        for j in J for r in R for k in K[:-1])
     pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
     # make sure that all pattern length in region 1 are smaller than those in region 0
@@ -192,14 +211,14 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
 
         for j in J:
             if x[j, k, r].X > 0.1:
-                tot_press_height += np.round(x[j, k, r].X) * H[j] / 45.0
+                tot_press_height += np.round(x[j, k, r].X) * H[j] / GlulamConfig.LAYER_HEIGHT
                 for i in I:
                     if A[i, j] > 0.1:
                         item_waste = H[j] * (Lp[k, r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
                         item_used = np.round(x[j, k, r].X) * A[i, j]
                         pattern_used = np.round(x[j, k, r].X)
                         item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, L[j],
-                                     np.round(H[j] / 45.0),
+                                     np.round(H[j] / GlulamConfig.LAYER_HEIGHT),
                                      pattern_used, item_used, np.round(Lp[k, r].X), f"{RW[j]:.0f}"]
                         print(row_format.format(*item_info))
                         # Keep track of total values
