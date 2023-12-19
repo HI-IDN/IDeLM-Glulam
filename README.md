@@ -8,17 +8,15 @@ IDeLM-Glulam/
 │   └── glulam.csv               # Default data file
 │
 ├── models/
-│   ├── __init__.py
 │   ├── cutting_pattern.py      # Code for cutting pattern generation (Gurobi MIP)
 │   └── pack_n_press.py         # Code for packaging optimization (Gurobi MIP)
 │
 ├── strategies/
-│   ├── __init__.py
 │   └── evolution_strategy.py   # Code for evolution strategy (1+1 ES)
 │
 ├── utils/
-│   ├── __init__.py
-│   └── data_processor.py       # Utility for processing data file
+│   ├── data_processor.py       # Utility for processing data file
+│   └── test_suite.py           # Code for unit tests for the code
 │
 └── main.py                     # Main script to run the optimizer
 ```

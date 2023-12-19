@@ -4,7 +4,7 @@ import numpy as np
 from config.settings import GlulamConfig
 
 
-def pack_n_press(merged, nump, debug=True):
+def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_LIMIT, debug=True):
     """
     Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
     1) to minimize the waste and 2) to minimize the difference between demand and supply.
@@ -27,26 +27,26 @@ def pack_n_press(merged, nump, debug=True):
     A = merged.A
     b = merged.b
     RW = merged.R
-    #O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
+    # O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
 
     # parameters
     bigM = 100000000  # a big number
     delta = 100
-    print("number of presses:", nump)
+    print("number of presses:", number_of_presses)
 
     # sets
     I = range(A.shape[0])  # items
     J = range(A.shape[1])  # cutting patterns
-    K = range(nump)  # presses
+    K = range(number_of_presses)  # presses
     R = range(len(GlulamConfig.MIN_HEIGHT_LAYER_REGION))  # regions
-  
-    #C = range(O.shape[1])  # list of customers
+
+    # C = range(O.shape[1])  # list of customers
 
     # model and solve parameters
     print("pack'n'press...")
     pmodel = gp.Model("pack_n_press")  # the packing model
     pmodel.setParam('OutputFlag', GlulamConfig.GUROBI_OUTPUT_FLAG)
-    pmodel.setParam('TimeLimit', GlulamConfig.GUROBI_TIME_LIMIT)
+    pmodel.setParam('TimeLimit', time_limit)
 
     # decision variables
     x = pmodel.addVars(J, K, R, vtype=GRB.INTEGER)  # number of times pattern j is used in press k and region r
@@ -56,8 +56,8 @@ def pack_n_press(merged, nump, debug=True):
     z = pmodel.addVars(K, R, vtype=GRB.BINARY)  # is press k used in region r
     h1 = pmodel.addVars(K, vtype=GRB.BINARY)  # is height in press k region 0 less than 24 layers
     F = pmodel.addVars(J, K, R)
-    #Cp = pmodel.addVars(K,C)
-    #Ci = pmodel.addVars(K,C, vtype=GRB.BINARY)
+    # Cp = pmodel.addVars(K,C)
+    # Ci = pmodel.addVars(K,C, vtype=GRB.BINARY)
 
     # indicate if a pattern is used or not in press k region r
     pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
@@ -82,9 +82,9 @@ def pack_n_press(merged, nump, debug=True):
         gp.quicksum(x[j, k, 0] for j in J) >= z[k, 1] for k in K)  # if region 1 is used then region 0 is used
 
     # is customer with product in this press and then how many?
-    #pmodel.addConstrs(Cp[k,c] == gp.quicksum(x[j, k, r]*A[i,j]*O[i,c] for j in J for r in R) for k in K for c in C)
+    # pmodel.addConstrs(Cp[k,c] == gp.quicksum(x[j, k, r]*A[i,j]*O[i,c] for j in J for r in R) for k in K for c in C)
     # indicator if Cp is larger than zero
-    #pmodel.addConstrs(Ci[k,c]*bigM >= Cp[k,c] for k in K for c in C)
+    # pmodel.addConstrs(Ci[k,c]*bigM >= Cp[k,c] for k in K for c in C)
 
     # if the press is not used the x must be zero
     pmodel.addConstrs(x[j, k, r] <= bigM * z[k, r] for j in J for k in K for r in R)
@@ -118,10 +118,11 @@ def pack_n_press(merged, nump, debug=True):
     # see if model is infeasible
     if pmodel.status == GRB.INFEASIBLE:
         print("The model is infeasible; quitting, increase number of presses")
-        return False, None, None, None, None
+        return False, None, None, None, None, None
     # extract rollwidths used
     RW_used = [RW[j] for j in J for k in K for r in R if x[j, k, r].X > 0.1]
     RW_used, RW_counts = np.unique(RW_used, return_counts=True)
+    obj_value = pmodel.ObjVal
 
     # extract the solution
     Lp_ = np.zeros((len(K), len(R)))  # the length of the press
@@ -138,7 +139,7 @@ def pack_n_press(merged, nump, debug=True):
         print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW)
 
     # return all omega values
-    return True, Waste_, Lp_, RW_used, RW_counts
+    return True, Waste_, Lp_, RW_used, RW_counts, obj_value
 
 
 def print_press_results(K, R, Lp_, h, Waste_):
@@ -217,3 +218,8 @@ def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
             single_press_info(k, r)
 
     print(seperator_major)
+
+
+def test_pack_n_press(merged, number_of_presses, time_limit):
+    success, Waste_, Lp_, RW_used, RW_counts, obj_value = pack_n_press(merged, number_of_presses, time_limit)
+    return success, obj_value

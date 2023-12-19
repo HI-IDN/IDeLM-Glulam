@@ -31,7 +31,7 @@ def main(file_path, depth):
     success = False
     while success == False:
         number_of_presses += 1
-        success, waste, Lp, used_roll_widths, count_roll_widths = pack_n_press(merged, number_of_presses)
+        success, waste, Lp, used_roll_widths, count_roll_widths, obj_val = pack_n_press(merged, number_of_presses)
 
     # summarize how many and which rolls are used
     print("A.shape=", merged.A.shape)
