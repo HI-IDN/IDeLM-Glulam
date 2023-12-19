@@ -26,7 +26,7 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
     L = merged.W
     A = merged.A
     b = merged.b
-    RW = merged.R
+    RW = merged.RW
     # O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
 
     # parameters

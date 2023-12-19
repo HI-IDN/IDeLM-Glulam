@@ -26,12 +26,12 @@ class GlulamPatternProcessor:
         self._A = np.zeros((self.data.m, self.data.m * 2))
         self._H = np.zeros(self.data.m * 2)
         self._W = np.zeros(self.data.m * 2)
-        self._R = np.zeros(self.data.m * 2)
+        self._RW = np.zeros(self.data.m * 2)
         for i in range(self.data.m):
             self._A[i, i] = 1
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
-            self._R[i] = self._W[i] # this could also be rounded to discete values jumping on GlulamConfig.ROLL_WIDTH_TOLERANCE
+            self._RW[i] = self._W[i]  # ro rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
         for i in range(self.data.m):
             copies = np.floor(self.roll_width / self.data.widths[i])  # How many copies of the pattern can be made
             copies = min(copies, self.data.quantity[i])  # Never make more copies of the pattern than the demand
@@ -39,8 +39,8 @@ class GlulamPatternProcessor:
             self._A[i, self.data.m + i] = copies
             self._H[self.data.m + i] = self.data.heights[i]
             self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
-            self._R[self.data.m + i] = self._W[self.data.m + i]
-            #print("initial rollwidth", self.data.m + i, ":", self._R[self.data.m + i])
+            self._RW[self.data.m + i] = self._W[self.data.m + i]
+
         self._remove_duplicate_patterns()
 
     @property
@@ -69,9 +69,9 @@ class GlulamPatternProcessor:
         return self._W
 
     @property
-    def R(self):
+    def RW(self):
         """ Roll width """
-        return self._R
+        return self._RW
 
     @property
     def m(self):
@@ -122,13 +122,13 @@ class GlulamPatternProcessor:
                 - x (gurobi.Var): Quantities for each pattern to be cut, a decision variable in cut_model problem.
             """
             # Create a filter for indices of patterns that are used (x[j] > 0) and not lose the identity patterns
-            used_patterns_filter = [j for j in self.J if x[j].X >= 0.0000001 or j <= 2*self.data.m]
+            used_patterns_filter = [j for j in self.J if x[j].X >= 0.0000001 or j <= 2 * self.data.m]
 
             # Apply the filter to H, W, and A
             self._H = self._H[used_patterns_filter]
             self._W = self._W[used_patterns_filter]
             self._A = self._A[:, used_patterns_filter]
-            self._R = self._R[used_patterns_filter]
+            self._RW = self._RW[used_patterns_filter]
 
         bailout = False
         while not bailout:
@@ -180,40 +180,46 @@ class GlulamPatternProcessor:
         pattern has been added to the pattern matrix).
         """
         # A large number for big-M method in MIP
-        bigM = 1000000
+        bigM = 1e6
 
         # Initialize the knapsack model
-        knapmodel = gp.Model("Knapsack")
-        knapmodel.setParam('OutputFlag', 0)  # Suppress output for cleaner execution
+        knap_model = gp.Model("Knapsack")
+        knap_model.setParam('OutputFlag', 0)  # Suppress output for cleaner execution
 
         # Decision variables for the knapsack problem
-        use = knapmodel.addVars(self.I, lb=0, vtype=gp.GRB.INTEGER)  # Pattern usage variables
-        h = knapmodel.addVar()  # Height of the roll
-        z = knapmodel.addVars(self.I, vtype=gp.GRB.BINARY)  # Binary variables for height constraints
+        use = knap_model.addVars(self.I, lb=0, vtype=gp.GRB.INTEGER)
+        """ Pattern usage variables: How many times each pattern is used. """
+
+        h = knap_model.addVar()
+        """ Height of the roll. """
+
+        z = knap_model.addVars(self.I, vtype=gp.GRB.BINARY)
+        """ Indicator variables for height constraints. """
 
         # Objective: Minimize reduced cost
-        knapmodel.setObjective(1.0 - gp.quicksum(pi[i] * use[i] for i in self.I), gp.GRB.MINIMIZE)
+        knap_model.setObjective(1.0 - gp.quicksum(pi[i] * use[i] for i in self.I), gp.GRB.MINIMIZE)
 
         # Width constraint: Total width used must not exceed roll width
-        knapmodel.addConstr(gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
-        knapmodel.addConstr(
+        knap_model.addConstr(
+            gp.quicksum(self.data.widths[i] * use[i] for i in self.I) <= self.roll_width)  # Width limit
+        knap_model.addConstr(
             gp.quicksum(self.data.widths[i] * use[i] for i in
                         self.I) >= self.roll_width - GlulamConfig.ROLL_WIDTH_TOLERANCE)  # Width limit
 
         # Indicator constraints for height limits
-        knapmodel.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
-        knapmodel.addConstrs(h >= self.data.heights[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
-        knapmodel.addConstrs(h <= self.data.heights[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
+        knap_model.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
+        knap_model.addConstrs(h >= self.data.heights[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
+        knap_model.addConstrs(h <= self.data.heights[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
 
         # Solve the knapsack problem
-        knapmodel.optimize()
+        knap_model.optimize()
 
         # Bailout if not feasible solution found
-        if knapmodel.status != gp.GRB.OPTIMAL:
+        if knap_model.status != gp.GRB.OPTIMAL:
             return True
 
         # Check if a new pattern with negative reduced cost is found
-        if knapmodel.objval < -0.0000001:
+        if knap_model.objval < -0.0000001:
 
             # Generate a new pattern based on the solution of the sub problem
             new_pattern = np.array([[int(use[i].X)] for i in self.I])
@@ -228,11 +234,11 @@ class GlulamPatternProcessor:
             # Calculate the total width of the new pattern: This is done by summing the width of each item in the
             # pattern multiplied by its usage (use[i].X). Then, flatten the array to ensure it's a 1D array
             W = np.array(np.sum([use[i].X * self.data.widths[i] for i in self.I])).flatten()
-            # Append this total width to the W array. This adds the total width of the new pattern to the existing widths
+            # Append this total width of the new pattern to the W array of existing widths
             self._W = np.concatenate((self._W, W))
 
             # Append the roll width to the R array
-            self._R = np.concatenate((self._R, np.array([self.roll_width])))
+            self._RW = np.concatenate((self._RW, np.array([self.roll_width])))
 
             return False
         else:
@@ -249,7 +255,7 @@ class GlulamPatternProcessor:
 
         self._H = self._H[unique_indices]
         self._W = self._W[unique_indices]
-        self._R = self._R[unique_indices]
+        self._RW = self._RW[unique_indices]
 
 
 class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
@@ -271,15 +277,15 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self._A = np.hstack((self._A, pattern.A))
         self._H = np.concatenate((self._H, pattern.H))
         self._W = np.concatenate((self._W, pattern.W))
-        self._R = np.concatenate((self._R, pattern.R))
+        self._RW = np.concatenate((self._RW, pattern.RW))
         self._remove_duplicate_patterns()
 
     def remove_roll_width(self, roll_width):
         """
         Removes cutting patterns for the given roll width from the existing patterns.
         """
-        ix = np.where(self._R == roll_width)
+        ix = np.where(self._RW == roll_width)
         self._A = np.delete(self._A, ix, axis=1)
         self._H = np.delete(self._H, ix)
         self._W = np.delete(self._W, ix)
-        self._R = np.delete(self._R, ix)
+        self._RW = np.delete(self._RW, ix)
