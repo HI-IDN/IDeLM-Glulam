@@ -21,6 +21,24 @@ To set up the project on your local machine:
     pip install -r requirements.txt
     ```
 
+## Gurobi Licensing
+
+To use Gurobi, you'll need to log in to their platform and set up a license on your machine. Detailed instructions for
+obtaining and setting up the license can be
+found [here](https://support.gurobi.com/hc/en-us/articles/12872879801105#section:RetrieveLicense).
+
+Once you have the license file, it should be placed in one of the following default locations depending on your
+operating system:
+
+* `C:\gurobi\` for Windows
+* `/opt/gurobi/` for Linux
+* `/Library/gurobi/` for Mac OS X
+
+Alternatively, you can set the `GRB_LICENSE_FILE` environment variable to the path of your license file. Doing so will
+override the above default locations.
+
+Please note that the code has been tested with Gurobi version 11, using a free academic license.
+
 ## Usage
 
 Run the optimizer:
@@ -39,6 +57,7 @@ millimeters. Each press must have the same depth. From the example data file, th
 or 185mm. The depth is specified as a command line argument when running the `main.py`. The default depth is 115mm.
 
 ## Project Structure
+
 ```
 IDeLM-Glulam/
 │
