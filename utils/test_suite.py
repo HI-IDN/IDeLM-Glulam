@@ -9,7 +9,7 @@ import unittest
 from config.settings import GlulamConfig
 from utils.data_processor import GlulamDataProcessor
 from models.cutting_pattern import GlulamPatternProcessor, ExtendedGlulamPatternProcessor
-from models.pack_n_press import test_pack_n_press
+from models.pack_n_press import GlulamPackagingProcessor
 
 
 class TestGlulamDataProcessor(unittest.TestCase):
@@ -79,6 +79,7 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 45)
         merged.remove_roll_width(24000)
+        self.assertFalse(24000 not in merged.roll_widths)
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 35)
 
@@ -86,20 +87,26 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
 class TestGlulamPackagingProcessor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        print('Setting up TestGlulamPackagingProcessor')
+        print('Setting up GlulamPackagingProcessor')
         data = GlulamDataProcessor('data/glulam.csv', 115)
-        cls.pattern = ExtendedGlulamPatternProcessor(data)
+        pattern = ExtendedGlulamPatternProcessor(data)
         for roll_width in [25000, 23600, 24500, 23800, 22600]:
-            cls.pattern.add_roll_width(roll_width)
+            pattern.add_roll_width(roll_width)
+        cls.press = GlulamPackagingProcessor(pattern)
 
     def test_press(self):
-        success, obj_val = test_pack_n_press(self.pattern, 5, 180)
-        self.assertFalse(success, "Five presses are not enough")
-        success, obj_val = test_pack_n_press(self.pattern, 7, 180)
-        self.assertTrue(success, "Seven presses are enough")
+        self.press.update_number_of_presses(5)
+        self.press.pack_n_press(10)
+        self.assertFalse(self.press.solved, "Five presses are not enough")
+
+        self.press.update_number_of_presses(7)
+        Waste_, Lp_, RW_used, RW_counts, obj_val = self.press.pack_n_press(300)
+        self.assertTrue(self.press.solved, "Seven presses are enough")
         self.assertTrue(round(obj_val) <= 178920)
-        success, obj_val = test_pack_n_press(self.pattern, 6, 300)
-        self.assertTrue(success, "Six presses are enough")
+
+        self.press.update_number_of_presses(6)
+        Waste_, Lp_, RW_used, RW_counts, obj_val = self.press.pack_n_press(300)
+        self.assertTrue(self.press.solved, "Six presses are enough")
         self.assertTrue(round(obj_val) <= 52470)
 
 

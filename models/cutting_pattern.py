@@ -267,11 +267,19 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
         """
         super().__init__(data, roll_width=None)  # Initialize the base class
+        self._roll_widths = set()
+
+    @property
+    def roll_widths(self):
+        return self._roll_widths
 
     def add_roll_width(self, roll_width):
         """
         Generates cutting patterns for the given roll width and adds them to the existing patterns.
         """
+        if roll_width in self._roll_widths:
+            return
+
         pattern = GlulamPatternProcessor(self.data, roll_width)
         pattern.cutting_stock_column_generation()
         self._A = np.hstack((self._A, pattern.A))
@@ -279,13 +287,18 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self._W = np.concatenate((self._W, pattern.W))
         self._RW = np.concatenate((self._RW, pattern.RW))
         self._remove_duplicate_patterns()
+        self._roll_widths.add(roll_width)
 
     def remove_roll_width(self, roll_width):
         """
         Removes cutting patterns for the given roll width from the existing patterns.
         """
+        if roll_width not in self.roll_widths:
+            return
+
         ix = np.where(self._RW == roll_width)
         self._A = np.delete(self._A, ix, axis=1)
         self._H = np.delete(self._H, ix)
         self._W = np.delete(self._W, ix)
         self._RW = np.delete(self._RW, ix)
+        self._roll_widths.remove(roll_width)
