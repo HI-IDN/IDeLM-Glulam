@@ -79,7 +79,7 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 45)
         merged.remove_roll_width(24000)
-        self.assertFalse(24000 not in merged.roll_widths)
+        self.assertFalse(24000 in merged.roll_widths)
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 35)
 
