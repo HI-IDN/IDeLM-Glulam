@@ -27,7 +27,7 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
     A = merged.A
     b = merged.b
     RW = merged.RW
-    # O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
+    O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
 
     # parameters
     bigM = 100000000  # a big number
@@ -40,7 +40,8 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
     K = range(number_of_presses)  # presses
     R = range(len(GlulamConfig.MIN_HEIGHT_LAYER_REGION))  # regions
 
-    # C = range(O.shape[1])  # list of customers
+    C = range(len(O))  # list of customers
+    assert len(C) == len(I), "number of customer IDs must be equal to number of items"
 
     # model and solve parameters
     print("pack'n'press...")
