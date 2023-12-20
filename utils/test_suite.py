@@ -9,7 +9,7 @@ import unittest
 from config.settings import GlulamConfig
 from utils.data_processor import GlulamDataProcessor
 from models.cutting_pattern import GlulamPatternProcessor, ExtendedGlulamPatternProcessor
-from models.pack_n_press import test_pack_n_press
+from models.pack_n_press import GlulamPackagingProcessor
 
 
 class TestGlulamDataProcessor(unittest.TestCase):
@@ -51,6 +51,10 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.check_number_of_patterns(self.pattern, 34)
         self.check_number_of_patterns(self.pattern_smaller, 33)
 
+    def test_W(self):
+        self.assertTrue((self.data.widths @ self.pattern.A == self.pattern.W).all())
+        self.assertTrue((self.data.widths @ self.pattern_smaller.A == self.pattern_smaller.W).all())
+
     def test_demand(self):
         def check_demand(pattern):
             for width, quantity, demand in zip(pattern.data.widths, pattern.data.quantity, pattern.b):
@@ -66,7 +70,7 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.assertTrue(pattern.A.shape == (pattern.m, pattern.n), "A should be a m x n matrix.")
         self.assertTrue(pattern.H.shape == (pattern.n,), "H should be a n x 1 vector.")
         self.assertTrue(pattern.W.shape == (pattern.n,), "W should be a n x 1 vector.")
-        self.assertTrue(pattern.RW.shape == (pattern.n,), "R should be a n x 1 vector.")
+        self.assertTrue(pattern.RW.shape == (pattern.n,), "RW should be a n x 1 vector.")
 
     def test_A(self):
         self.check_AHWR(self.pattern)
@@ -79,6 +83,7 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 45)
         merged.remove_roll_width(24000)
+        self.assertFalse(24000 in merged.roll_widths)
         self.check_AHWR(merged)
         self.check_number_of_patterns(merged, 35)
 
@@ -86,21 +91,29 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
 class TestGlulamPackagingProcessor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        print('Setting up TestGlulamPackagingProcessor')
+        print('Setting up GlulamPackagingProcessor')
         data = GlulamDataProcessor('data/glulam.csv', 115)
-        cls.pattern = ExtendedGlulamPatternProcessor(data)
+        pattern = ExtendedGlulamPatternProcessor(data)
         for roll_width in [25000, 23600, 24500, 23800, 22600]:
-            cls.pattern.add_roll_width(roll_width)
+            pattern.add_roll_width(roll_width)
+        cls.press = GlulamPackagingProcessor(pattern)
 
     def test_press(self):
-        success, obj_val = test_pack_n_press(self.pattern, 5, 180)
-        self.assertFalse(success, "Five presses are not enough")
-        success, obj_val = test_pack_n_press(self.pattern, 7, 180)
-        self.assertTrue(success, "Seven presses are enough")
-        self.assertTrue(round(obj_val) <= 178920)
-        success, obj_val = test_pack_n_press(self.pattern, 6, 420)
-        self.assertTrue(success, "Six presses are enough")
-        self.assertTrue(round(obj_val) <= 52470)
+        self.press.update_number_of_presses(5)
+        self.press.pack_n_press(10)
+        self.assertFalse(self.press.solved, "Five presses are not enough")
+
+        self.press.update_number_of_presses(7)
+        self.press.pack_n_press(420)
+        self.assertTrue(self.press.solved, "Seven presses are enough")
+        self.assertTrue(round(self.press.ObjectiveValue) == 33030, f'Objective was {self.press.ObjectiveValue}.')
+        self.press.print_results()
+
+        self.press.update_number_of_presses(6)
+        self.press.pack_n_press(420)
+        self.assertTrue(self.press.solved, "Six presses are enough")
+        self.assertTrue(round(self.press.ObjectiveValue) == 52470, f'Objective was {self.press.ObjectiveValue}.')
+        self.press.print_results()
 
 
 # This allows running the tests directly from this script
