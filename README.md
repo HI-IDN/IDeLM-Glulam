@@ -57,6 +57,7 @@ IDeLM-Glulam/
 │
 ├── utils/
 │   ├── data_processor.py       # Utility for processing data file
+│   ├── plotter.py              # Utility for plotting results
 │   └── test_suite.py           # Code for unit tests for the code
 │
 ├── .gitignore                  # File specifying untracked files to ignore
