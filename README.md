@@ -56,6 +56,12 @@ the number of beams required for each order. There are 5 orders in the example d
 millimeters. Each press must have the same depth. From the example data file, the depth can be 90mm, 115mm, 140mm, 160mm
 or 185mm. The depth is specified as a command line argument when running the `main.py`. The default depth is 115mm.
 
+## Testing
+To run unit tests, execute:
+```
+python3 utils/test_suite.py
+```
+
 ## Project Structure
 
 ```
