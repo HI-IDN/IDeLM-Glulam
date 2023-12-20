@@ -28,8 +28,8 @@ def main(file_path, depth):
     for roll_width in roll_widths:
         merged.add_roll_width(roll_width)
 
-    press = GlulamPackagingProcessor(merged, int(GlulamConfig.MAX_PRESSES) - 1)
-    while not press.solved:
+    press = GlulamPackagingProcessor(merged, 0)
+    while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
         press.update_number_of_presses(press.number_of_presses + 1)
         press.pack_n_press()
         press.print_results()

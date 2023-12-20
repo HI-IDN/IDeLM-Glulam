@@ -6,6 +6,14 @@ from config.settings import GlulamConfig
 
 class GlulamPackagingProcessor:
     def __init__(self, pattern_processor, number_of_presses=GlulamConfig.MAX_PRESSES):
+        """
+        Initializes the GlulamPackagingProcessor with pattern data and the number of presses.
+
+        Parameters:
+        - pattern_processor (ExtendedGlulamPatternProcessor): Processor containing glulam pattern data.
+        - number_of_presses (int): The number of presses available for packaging. Defaults to the maximum number
+                                   specified in GlulamConfig.
+        """
         self.patterns = pattern_processor
         """ Pattern data set from GlulamPatternProcessor. """
 
@@ -21,6 +29,9 @@ class GlulamPackagingProcessor:
         self.Lp = None
         """ Length of each press. """
 
+        self.Lp_ = None
+        """ The actual length of each press. """
+
         self.RW_used = None
         """ Roll widths used. """
 
@@ -28,10 +39,19 @@ class GlulamPackagingProcessor:
         """ Roll width counts. """
 
         self.solved = False
-        """ Boolean if model has been packaged and pressed successfully. """
+        """ Boolean, True if model has been packaged and pressed successfully. """
+
+        self.ObjectiveValue = None
+        """ Value of the objective function. """
 
     def update_number_of_presses(self, number_of_presses):
-        """ Update the number of presses that can be used. """
+        """
+        Update the number of presses that can be used.
+
+        Parameters:
+        - number_of_presses (int): The new number of presses to be used.
+        """
+        assert number_of_presses <= GlulamConfig.MAX_PRESSES, f'Cannot surpass {GlulamConfig.MAX_PRESSES} presses. Check data.'
         self._number_of_presses = number_of_presses
 
     @property
@@ -54,6 +74,7 @@ class GlulamPackagingProcessor:
 
     @property
     def A(self):
+        """ A matrix with patterns. """
         return self.patterns.A
 
     @property
@@ -100,30 +121,19 @@ class GlulamPackagingProcessor:
 
         """
 
-        H = self.H
-        L = self.L
-        A = self.A
-        b = self.b
-        RW = self.RW
-
-        # Assuming merged.O is your array of order IDs
-        Oid = self.patterns.O
-        Ounique, inverse = np.unique(Oid, return_inverse=True)
-        O = np.zeros((len(Oid), len(Ounique)))
-        O[np.arange(len(Oid)), inverse] = 1
-        print(O.shape)
-        print(O)
+        self.solved = False
+        self.RW_counts = False
+        self.RW_used = False
+        self.ObjectiveValue = None
+        self.Lp = None
+        self.Lp_ = None
+        self.Waste = None
+        self.x = None
+        self.h = None
 
         # parameters
         bigM = 1e8  # a big number
-        delta = 100
         print("number of presses:", self._number_of_presses)
-
-        # sets
-        I = self.I
-        J = self.J
-        K = self.K
-        R = range(self._number_of_regions)  # regions
 
         # model and solve parameters
         print("pack'n'press...")
@@ -132,86 +142,81 @@ class GlulamPackagingProcessor:
         pmodel.setParam('TimeLimit', time_limit)
 
         # decision variables
-        x = pmodel.addVars(J, K, R, vtype=GRB.INTEGER)
+        x = pmodel.addVars(self.J, self.K, self.R, vtype=GRB.INTEGER)
         """ The number of times pattern j is used in press k and region r. """
 
-        x1 = pmodel.addVars(J, K, R, vtype=GRB.BINARY)
+        x1 = pmodel.addVars(self.J, self.K, self.R, vtype=GRB.BINARY)
         """ Whether pattern j is used in press k and region r."""
 
-        h = pmodel.addVars(K, R)
+        h = pmodel.addVars(self.K, self.R)
         """ The height of each region. """
 
-        Lp = pmodel.addVars(K, R)
+        Lp = pmodel.addVars(self.K, self.R)
         """ The length of each region. """
 
-        z = pmodel.addVars(K, R, vtype=GRB.BINARY)
+        z = pmodel.addVars(self.K, self.R, vtype=GRB.BINARY)
         """ Whether press k is used in region r. """
 
-        h1 = pmodel.addVars(K, vtype=GRB.BINARY)
+        h1 = pmodel.addVars(self.K, vtype=GRB.BINARY)
         """ Whether the height of region 0 in press k is less than MIN_HEIGHT_LAYER_REGION layers (i.e. 24 layers)."""
 
-        F = pmodel.addVars(J, K, R)
+        F = pmodel.addVars(self.J, self.K, self.R)
         """ The surplus of pattern j in press k and region r. """
 
-        Cp = pmodel.addVars(K, I)
-        Ci = pmodel.addVars(K, I, vtype=GRB.BINARY)
-
         # indicate if a pattern is used or not in press k region r
-        pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
+        pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in self.J for k in self.K for r in self.R)
 
         # compute height of each region
         pmodel.addConstrs(
-            gp.quicksum((H[j] / GlulamConfig.LAYER_HEIGHT) * x[j, k, r] for j in J) == h[k, r] for k in K for r in R)
+            gp.quicksum((self.H[j] / GlulamConfig.LAYER_HEIGHT) * x[j, k, r] for j in self.J) == h[k, r]
+            for k in self.K for r in self.R)
+
         # the total height of the region must be less than the maximum height of the press
         pmodel.addConstrs(
-            gp.quicksum(h[k, r] for r in R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in K)
+            gp.quicksum(h[k, r] for r in self.R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in self.K)
 
         # h[k,0] is the height of the R0 in press k, and we must make sure that it is at least the minimum height
         pmodel.addConstrs(
             h[k, 0] >=
-            GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in K[:-1])
+            GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in self.K[:-1])
 
         # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
         # and R1 is at least the minimum height for R1.
         pmodel.addConstrs(
-            gp.quicksum(h[k, r] for r in R) >=
-            GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in K[:-1])
+            gp.quicksum(h[k, r] for r in self.R) >=
+            GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in self.K[:-1])
         pmodel.addConstrs(
-            gp.quicksum(x[j, k, 0] for j in J) >= z[k, 1] for k in K)  # if region 1 is used then region 0 is used
-
-        # is customer with product in this press and then how many?
-        # pmodel.addConstrs(Cp[k,c] == gp.quicksum(x[j, k, r]*A[i,j]*O[i,c] for j in J for r in R) for k in K for c in C)
-        # indicator if Cp is larger than zero
-        # pmodel.addConstrs(Ci[k,c]*bigM >= Cp[k,c] for k in K for c in C)
+            gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in
+            self.K)  # if region 1 is used then region 0 is used
 
         # if the press is not used the x must be zero
-        pmodel.addConstrs(x[j, k, r] <= bigM * z[k, r] for j in J for k in K for r in R)
+        pmodel.addConstrs(x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R)
 
         # now we must fulfill the demand for each item exactly
-        pmodel.addConstrs(gp.quicksum(A[i, j] * x[j, k, r] for j in J for k in K for r in R) == b[i] for i in I)
+        pmodel.addConstrs(
+            gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
+            == self.b[i] for i in self.I)
 
         # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
         # h1[k] will indicate that the height of region 0 is less than 24 layers
         pmodel.addConstrs(
             h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
-            for k in K[:-1])
+            for k in self.K[:-1])
         pmodel.addConstrs(
             Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
-            for r in R for k in K[:-1])
-        pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
+            for r in self.R for k in self.K[:-1])
+        pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
 
         # make sure that all pattern length in region 1 are smaller than those in region 0
-        # pmodel.addConstrs(x1[i, k, 0] * L[i] >= x1[j, k, 1] * L[j] - (1-x1[i, k, 0])*bigM - (1-x1[j, k, 1])*bigM for i in I for j in J for k in K)
         # make sure that the length of region 0 is longer than region 1
-        pmodel.addConstrs(Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in K)
+        pmodel.addConstrs(Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K)
         pmodel.addConstrs(
-            (Lp[k, r] - L[j]) * H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM for j in J for k in K for r in R)
+            (Lp[k, r] - self.L[j]) * self.H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM
+            for j in self.J for k in self.K for r in self.R)
+
         # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
         pmodel.setObjective(
-            # gp.quicksum(Lp[k,r] for k in K for r in R
-            # gp.quicksum((Lp[k,r] - L[j])*H[j]*x[j,k,r] for j in J for k in K for r in R)/1000./1000.
-            gp.quicksum(F[j, k, r] for j in J for k in K for r in R)
-            # + gp.quicksum(delta[k,r] for k in K for r in R)
+            gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)
             , GRB.MINIMIZE)
 
         # solve the model
@@ -220,39 +225,32 @@ class GlulamPackagingProcessor:
         # see if model is infeasible
         if pmodel.status == GRB.INFEASIBLE:
             print("The model is infeasible; quitting, increase number of presses")
-            self.solved = False
-            self.RW_counts = False
-            self.RW_used = False
-            self.obj_value = None
-            self.Lp = None
-            self.Waste = None
-            self.x = None
-            self.h = None
-            return None, None, None, None, None
+            return
 
-        # extract roll widths used
-        self.RW_used, self.RW_counts = np.unique([RW[j] for j in J for k in K for r in R if x[j, k, r].X > 0.1],
-                                                 return_counts=True)
-        self.obj_value = pmodel.ObjVal
-        self.x = np.array([[[x[j, k, r].X > 0.1 for r in R] for k in K] for j in J], dtype=bool)
-        self.h = np.array([[h[k, r].X for r in R] for k in K], dtype=float)
-        self.Lp = np.array([[Lp[k, r].X for r in R] for k in K], dtype=int)
+        # Extract the results
+        self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
+        self.RW_used, self.RW_counts = np.unique(
+            [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
+            return_counts=True)
+        self.ObjectiveValue = pmodel.ObjVal
+        self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=float)
+        self.Lp = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
 
         # extract the solution
-        Lp_ = np.zeros((len(K), len(R)))  # the length of the press
-        Waste_ = np.zeros((len(K), len(R)))
-        for k in K:
-            for r in R:
-                for j in J:
+        Lp_ = np.zeros((self._number_of_presses, self._number_of_regions))  # the length of the press
+        Waste_ = np.zeros((self._number_of_presses, self._number_of_regions))
+        for k in self.K:
+            for r in self.R:
+                for j in self.J:
                     if self.x[j, k, r]:
-                        Lp_[k, r] = int(max(Lp_[k, r], L[j]))
-                        Waste_[k, r] += H[j] * (Lp[k, r].X - L[j]) * self.x[j, k, r] / 1000 / 1000  # convert to m^2
+                        Lp_[k, r] = int(max(Lp_[k, r], self.L[j]))
+                        Waste_[k, r] += self.H[j] * (self.Lp[k, r] - self.L[j]) * self.x[
+                            j, k, r] / 1000 / 1000  # convert to m^2
         self.Lp_ = Lp_
         self.Waste = Waste_
 
         # return all omega values
         self.solved = True
-        return Waste_, Lp_, self.RW_used, self.RW_counts, self.obj_value
 
     def print_results(self):
         self.print_press_results()
@@ -276,7 +274,7 @@ class GlulamPackagingProcessor:
         for k in self.K:
             print(seperator_major if k == 0 else seperator_minor)
             for r in self.R:
-                press_info = [f'{k}.{r}', np.round(self.Lp[k, r]), np.round(self.h[k, r]),
+                press_info = [f'{k}.{r}', self.Lp[k, r], self.h[k, r],
                               f"{self.Waste[k, r]:.2f}"]
                 print(row_format.format(*press_info))
         print(seperator_major)

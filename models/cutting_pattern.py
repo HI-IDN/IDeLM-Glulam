@@ -23,17 +23,19 @@ class GlulamPatternProcessor:
             assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
         # The starting cutting patterns for each order
-        self._A = np.zeros((self.data.m, self.data.m * 2))
-        self._O = []
-        self._H = np.zeros(self.data.m * 2)
-        self._W = np.zeros(self.data.m * 2)
-        self._RW = np.zeros(self.data.m * 2)
+        self._A = np.zeros((self.data.m, self.data.m * 2), dtype=int)
+        self._H = np.zeros(self.data.m * 2, dtype=int)
+        self._W = np.zeros(self.data.m * 2, dtype=int)
+        self._RW = np.zeros(self.data.m * 2, dtype=int)
+
+        # Create one piece of each item
         for i in range(self.data.m):
             self._A[i, i] = 1
-            self._O.append(self.data.order[i])
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
             self._RW[i] = self._W[i]  # ro rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
+
+        # Create as many pieces as possible of each item
         for i in range(self.data.m):
             copies = np.floor(self.roll_width / self.data.widths[i])  # How many copies of the pattern can be made
             copies = min(copies, self.data.quantity[i])  # Never make more copies of the pattern than the demand
@@ -49,11 +51,6 @@ class GlulamPatternProcessor:
     def A(self):
         """ Pattern matrix, a matrix of size m x n, where m is the number of orders and n is the number of patterns. """
         return self._A
-
-    @property
-    def O(self):
-        """ Order vector, a matrix of size m x 1, where m is the number of orders. """
-        return self._O
 
     @property
     def b(self):
@@ -119,23 +116,6 @@ class GlulamPatternProcessor:
         - A (matrix): Final pattern matrix.
         - x (dict): Quantities for each pattern to be cut.
         """
-
-        def filter_unused_patterns(x):
-            """
-            Removes unused patterns from the pattern matrix A, and corresponding entries in H and W arrays.
-            A pattern is considered unused if its usage value x[j] is close to zero.
-
-            Parameters:
-                - x (gurobi.Var): Quantities for each pattern to be cut, a decision variable in cut_model problem.
-            """
-            # Create a filter for indices of patterns that are used (x[j] > 0) and not lose the identity patterns
-            used_patterns_filter = [j for j in self.J if x[j].X >= 0.0000001 or j <= 2 * self.data.m]
-
-            # Apply the filter to H, W, and A
-            self._H = self._H[used_patterns_filter]
-            self._W = self._W[used_patterns_filter]
-            self._A = self._A[:, used_patterns_filter]
-            self._RW = self._RW[used_patterns_filter]
 
         bailout = False
         while not bailout:
