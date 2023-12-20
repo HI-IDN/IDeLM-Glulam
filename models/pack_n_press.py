@@ -31,10 +31,17 @@ class GlulamPackagingProcessor:
         """ Boolean if model has been packaged and pressed successfully. """
 
     def update_number_of_presses(self, number_of_presses):
+        """ Update the number of presses that can be used. """
         self._number_of_presses = number_of_presses
 
     @property
+    def TotalWaste(self):
+        """ Total waste in all presses. """
+        return None if self.Waste is None else np.sum(self.Waste)
+
+    @property
     def number_of_presses(self):
+        """ Number of presses. """
         return self._number_of_presses
 
     @property
@@ -75,7 +82,7 @@ class GlulamPackagingProcessor:
         """ The set of regions. """
         return range(self._number_of_regions)
 
-    def pack_n_press(self, time_limit=GlulamConfig.GUROBI_TIME_LIMIT, debug=True):
+    def pack_n_press(self, time_limit=GlulamConfig.GUROBI_TIME_LIMIT):
         """
         Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
         1) to minimize the waste and 2) to minimize the difference between demand and supply.
@@ -214,11 +221,22 @@ class GlulamPackagingProcessor:
         if pmodel.status == GRB.INFEASIBLE:
             print("The model is infeasible; quitting, increase number of presses")
             self.solved = False
+            self.RW_counts = False
+            self.RW_used = False
+            self.obj_value = None
+            self.Lp = None
+            self.Waste = None
+            self.x = None
+            self.h = None
             return None, None, None, None, None
-        # extract rollwidths used
-        RW_used = [RW[j] for j in J for k in K for r in R if x[j, k, r].X > 0.1]
-        RW_used, RW_counts = np.unique(RW_used, return_counts=True)
-        obj_value = pmodel.ObjVal
+
+        # extract roll widths used
+        self.RW_used, self.RW_counts = np.unique([RW[j] for j in J for k in K for r in R if x[j, k, r].X > 0.1],
+                                                 return_counts=True)
+        self.obj_value = pmodel.ObjVal
+        self.x = np.array([[[x[j, k, r].X > 0.1 for r in R] for k in K] for j in J], dtype=bool)
+        self.h = np.array([[h[k, r].X for r in R] for k in K], dtype=float)
+        self.Lp = np.array([[Lp[k, r].X for r in R] for k in K], dtype=int)
 
         # extract the solution
         Lp_ = np.zeros((len(K), len(R)))  # the length of the press
@@ -226,19 +244,24 @@ class GlulamPackagingProcessor:
         for k in K:
             for r in R:
                 for j in J:
-                    if x[j, k, r].X > 0.1:
+                    if self.x[j, k, r]:
                         Lp_[k, r] = int(max(Lp_[k, r], L[j]))
-                        Waste_[k, r] += H[j] * (Lp[k, r].X - L[j]) * x[j, k, r].X / 1000 / 1000  # convert to m^2
-        # print the solution
-        if debug == True:
-            self.print_press_results(K, R, Lp_, h, Waste_)
-            self.print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW)
+                        Waste_[k, r] += H[j] * (Lp[k, r].X - L[j]) * self.x[j, k, r] / 1000 / 1000  # convert to m^2
+        self.Lp_ = Lp_
+        self.Waste = Waste_
 
         # return all omega values
         self.solved = True
-        return Waste_, Lp_, RW_used, RW_counts, obj_value
+        return Waste_, Lp_, self.RW_used, self.RW_counts, self.obj_value
 
-    def print_press_results(self, K, R, Lp_, h, Waste_):
+    def print_results(self):
+        self.print_press_results()
+        self.print_item_results()
+
+    def print_press_results(self):
+        if not self.solved:
+            return
+
         """ Print the information about the presses. """
         print("\n\nTable: Press Information\n")
         row_format = "{:<5} {:>8} {:>6} {:>8}"
@@ -250,15 +273,18 @@ class GlulamPackagingProcessor:
         print(seperator_major)
         print(header)
 
-        for k in K:
+        for k in self.K:
             print(seperator_major if k == 0 else seperator_minor)
-            for r in R:
-                press_info = [f'{k}.{r}', np.round(Lp_[k, r]), np.round(h[k, r].X),
-                              f"{Waste_[k, r]:.2f}"]
+            for r in self.R:
+                press_info = [f'{k}.{r}', np.round(self.Lp[k, r]), np.round(self.h[k, r]),
+                              f"{self.Waste[k, r]:.2f}"]
                 print(row_format.format(*press_info))
         print(seperator_major)
 
-    def print_item_results(self, A, b, K, R, I, J, H, L, x, Lp, RW):
+    def print_item_results(self):
+        if not self.solved:
+            return
+
         """ Print the information about the items pressed. """
         print("\n\nTable 2: Item Information\n")
         row_format = "{:<5} {:>4} {:>4} {:>8} {:>4} {:>7} {:>4} {:>7} {:>5} {:>5} {:>9}"
@@ -273,7 +299,7 @@ class GlulamPackagingProcessor:
         print(row_format.format(*subheader))
 
         def single_press_info(k, r):
-            if any([x[j, k, r].X > 0.1 for j in J]):
+            if any([self.x[j, k, r] for j in self.J]):
                 print(seperator_major if k == 0 and r == 0 else seperator_minor)
             else:
                 return
@@ -285,17 +311,17 @@ class GlulamPackagingProcessor:
             tot_items = set()
             tot_patterns = set()
 
-            for j in J:
-                if x[j, k, r].X > 0.1:
-                    tot_press_height += np.round(x[j, k, r].X) * H[j] / GlulamConfig.LAYER_HEIGHT
-                    for i in I:
-                        if A[i, j] > 0.1:
-                            item_waste = H[j] * (Lp[k, r].X - L[j]) * np.round(x[j, k, r].X) / 1000 / 1000
-                            item_used = np.round(x[j, k, r].X) * A[i, j]
-                            pattern_used = np.round(x[j, k, r].X)
-                            item_info = [f"{k}.{r}", i, b[i], f"{item_waste:.2f}", j, L[j],
-                                         np.round(H[j] / GlulamConfig.LAYER_HEIGHT),
-                                         pattern_used, item_used, np.round(Lp[k, r].X), f"{RW[j]:.0f}"]
+            for j in self.J:
+                if self.x[j, k, r]:
+                    tot_press_height += self.x[j, k, r] * self.H[j] / GlulamConfig.LAYER_HEIGHT
+                    for i in self.I:
+                        if self.A[i, j] > 0:
+                            item_waste = self.H[j] * (self.Lp[k, r] - self.L[j]) * self.x[j, k, r] / 1000 / 1000
+                            item_used = self.x[j, k, r] * self.A[i, j]
+                            pattern_used = self.x[j, k, r]
+                            item_info = [f"{k}.{r}", i, self.b[i], f"{item_waste:.2f}", j, self.L[j],
+                                         np.round(self.H[j] / GlulamConfig.LAYER_HEIGHT),
+                                         pattern_used, item_used, self.Lp[k, r], f"{self.RW[j]:.0f}"]
                             print(row_format.format(*item_info))
                             # Keep track of total values
                             tot_items.add(i)
@@ -308,8 +334,22 @@ class GlulamPackagingProcessor:
                          f"#{tot_press_height:.0f}", '-', '-', '-', '-']
             print(row_format.format(*item_info))
 
-        for k in K:
-            for r in R:
+        for k in self.K:
+            for r in self.R:
                 single_press_info(k, r)
 
         print(seperator_major)
+
+    def table_press_info(self):
+        """ Table per press and true waste. """
+        # Tafla 1: press and true waste.
+        pass
+
+    def table_press_region_info(self):
+        """ Table per press and region - with patterns lenght heigh and max length. """
+        # Tafla 2: press + region, patterns, length, height, og max length Lp(ekkert pseudo - area)
+        pass
+
+    def table_press_item_order(self):
+        """ Table per item - what press they are in and what order. """
+        pass

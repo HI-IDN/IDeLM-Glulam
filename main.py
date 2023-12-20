@@ -31,25 +31,26 @@ def main(file_path, depth):
     press = GlulamPackagingProcessor(merged, int(GlulamConfig.MAX_PRESSES) - 1)
     while not press.solved:
         press.update_number_of_presses(press.number_of_presses + 1)
-        waste, Lp, used_roll_widths, count_roll_widths, obj_val = press.pack_n_press()
+        press.pack_n_press()
+        press.print_results()
 
     # summarize how many and which rolls are used
     print("A.shape=", merged.A.shape)
     print(roll_widths)
     for i in range(len(roll_widths)):
         rw = roll_widths[i]
-        if rw not in used_roll_widths:
+        if rw not in press.RW_used:
             print(f"rollwidth {rw} is not used, remove it from the list of roll widths")
             merged.remove_roll_width(rw)
             print("A.shape=", merged.A.shape)
             # removing rollwidths from the list of rollwidths
             roll_widths[i] = -roll_widths[i]
     print(roll_widths)
-    print(used_roll_widths)
-    print(count_roll_widths)
+    print(press.RW_used)
+    print(press.RW_counts)
 
-    print(waste)
-    print("total waste = ", np.sum(waste))
+    print(press.Waste)
+    print("total waste = ", press.TotalWaste)
 
 
 if __name__ == "__main__":
