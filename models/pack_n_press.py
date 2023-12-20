@@ -1,6 +1,13 @@
+import logging
+
 import gurobipy as gp
 import numpy as np
 from config.settings import GlulamConfig
+from utils.logger import setup_logger
+
+
+# Setup logger
+logger = setup_logger('GlulamPackagingProc')
 
 
 class GlulamPackagingProcessor:
@@ -23,19 +30,19 @@ class GlulamPackagingProcessor:
         """ The number of regions. """
 
         self.Waste = None
-        """ Waste in each press and each region. """
+        """ Waste in each press and each region, given in m^2. """
 
         self.Lp = None
-        """ Length of each press. """
+        """ The length of each region, given in mm. """
 
         self.Lp_ = None
-        """ The actual length of each press. """
+        """ The actual length of each press, given in mm. """
 
         self.RW_used = None
-        """ Roll widths used. """
+        """ Roll widths used in all presses. """
 
         self.RW_counts = None
-        """ Roll width counts. """
+        """ Roll width frequencies in all presses. """
 
         self.solved = False
         """ Boolean, True if model has been packaged and pressed successfully. """
@@ -102,6 +109,9 @@ class GlulamPackagingProcessor:
         """ The set of regions. """
         return range(self._number_of_regions)
 
+    # Define a function to process Gurobi logs
+
+
     def pack_n_press(self, time_limit=GlulamConfig.GUROBI_TIME_LIMIT):
         """
         Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
@@ -120,6 +130,10 @@ class GlulamPackagingProcessor:
 
         """
 
+        # Use logger within these modules
+        logger.info(f"Starting Pack'n'Press model for {self.number_of_presses} presses.")
+        logger.info(f'Time limit for Gurobi: {time_limit} seconds.')
+
         self.solved = False
         self.RW_counts = False
         self.RW_used = False
@@ -132,13 +146,14 @@ class GlulamPackagingProcessor:
 
         # parameters
         bigM = 1e8  # a big number
-        print("number of presses:", self._number_of_presses)
 
         # model and solve parameters
-        print("pack'n'press...")
-        pmodel = gp.Model("pack_n_press")  # the packing model
+        pmodel = gp.Model("Pack'N'Press")  # the packing model
         pmodel.setParam('OutputFlag', GlulamConfig.GUROBI_OUTPUT_FLAG)
+
+        # Set time limit
         pmodel.setParam('TimeLimit', time_limit)
+
 
         # decision variables
         x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
@@ -223,33 +238,32 @@ class GlulamPackagingProcessor:
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
-            print("The model is infeasible; quitting, increase number of presses")
+            logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
             return
 
         # Extract the results
+        self.solved = True
         self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
         self.RW_used, self.RW_counts = np.unique(
             [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
             return_counts=True)
+        row_format = " ".join(["{:>5}"] * len(self.RW_used))
+        logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
+        logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
+        logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
         self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=float)
+        logger.debug(f'h:\n{self.h}')
         self.Lp = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
+        logger.debug(f'Lp:\n{self.Lp}')
 
-        # extract the solution
-        Lp_ = np.zeros((self._number_of_presses, self._number_of_regions))  # the length of the press
-        Waste_ = np.zeros((self._number_of_presses, self._number_of_regions))
-        for k in self.K:
-            for r in self.R:
-                for j in self.J:
-                    if self.x[j, k, r]:
-                        Lp_[k, r] = int(max(Lp_[k, r], self.L[j]))
-                        Waste_[k, r] += self.H[j] * (self.Lp[k, r] - self.L[j]) * self.x[
-                            j, k, r] / 1000 / 1000  # convert to m^2
-        self.Lp_ = Lp_
-        self.Waste = Waste_
-
-        # return all omega values
-        self.solved = True
+        # Compute the waste
+        self.Lp_ = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
+        logger.debug(f'Lp_:\n{self.Lp_}')
+        self.Waste = np.sum(self.H[:, None, None] * (self.Lp[None, :, :] - self.L[:, None, None]) * self.x / 1000000,
+                            axis=0)  # Waste in m^2
+        logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
+        logger.debug(f'Waste:\n{self.Waste}')
 
     def print_results(self):
         self.print_press_results()

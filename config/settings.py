@@ -21,3 +21,4 @@ class GlulamConfig:
     # Algorithm settings
     GUROBI_TIME_LIMIT = 420  # in seconds, 7 minutes
     GUROBI_OUTPUT_FLAG = 1  # 0: silent, 1: summary, 2: detailed, 3: verbose
+    VERBOSE_LOGGING = True

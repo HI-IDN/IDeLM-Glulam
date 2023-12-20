@@ -3,6 +3,11 @@
 from config.settings import GlulamConfig
 import numpy as np
 import gurobipy as gp
+from utils.logger import setup_logger
+
+# Setup logger
+single_logger = setup_logger('GlulamPatternProcessor')
+merged_logger = setup_logger('ExtendedGlulamPatternProcessor')
 
 
 class GlulamPatternProcessor:
@@ -22,6 +27,10 @@ class GlulamPatternProcessor:
             self.roll_width = roll_width
             assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
+
+        # Use logger within these modules
+        single_logger.info(f"Initialising Glulam Pattern Processor instance with {self.roll_width} roll width.")
+
         # The starting cutting patterns for each order
         self._A = np.zeros((self.data.m, self.data.m * 2), dtype=int)
         self._H = np.zeros(self.data.m * 2, dtype=int)
@@ -46,6 +55,8 @@ class GlulamPatternProcessor:
             self._RW[self.data.m + i] = self._W[self.data.m + i]
 
         self._remove_duplicate_patterns()
+
+        single_logger.info(f"Added {self.n} unique initial patterns.")
 
     @property
     def A(self):
@@ -199,6 +210,7 @@ class GlulamPatternProcessor:
 
         # Bailout if not feasible solution found
         if knap_model.status != gp.GRB.OPTIMAL:
+            single_logger.info(f"Cannot find more patterns; quitting the process with n={self.n}.")
             return True
 
         # Check if a new pattern with negative reduced cost is found
@@ -223,9 +235,11 @@ class GlulamPatternProcessor:
             # Append the roll width to the R array
             self._RW = np.concatenate((self._RW, np.array([self.roll_width])))
 
+            single_logger.info(f"Added a new pattern; continuing the process (n={self.n}).")
             return False
         else:
-            # No more patterns with negative reduced cost, stop the process
+            single_logger.info(
+                f"No more patterns with negative reduced cost found; quitting the process with n={self.n}.")
             return True
 
     def _remove_duplicate_patterns(self):
@@ -251,6 +265,7 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         """
         super().__init__(data, roll_width=None)  # Initialize the base class
         self._roll_widths = set()
+        merged_logger.info(f"Initialising Extended Glulam Pattern Processor instance with {self.n} patterns.")
 
     @property
     def roll_widths(self):
@@ -261,6 +276,7 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         Generates cutting patterns for the given roll width and adds them to the existing patterns.
         """
         if roll_width in self._roll_widths:
+            merged_logger.info(f"Roll width {roll_width} already exists in the existing patterns, n={self.n}.")
             return
 
         pattern = GlulamPatternProcessor(self.data, roll_width)
@@ -271,12 +287,15 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self._RW = np.concatenate((self._RW, pattern.RW))
         self._remove_duplicate_patterns()
         self._roll_widths.add(roll_width)
+        merged_logger.info(
+            f"Added {pattern.n} patterns for roll width {roll_width} to the existing patterns, now n={self.n}.")
 
     def remove_roll_width(self, roll_width):
         """
         Removes cutting patterns for the given roll width from the existing patterns.
         """
         if roll_width not in self.roll_widths:
+            merged_logger.info(f"Roll width {roll_width} not found in the existing patterns, n={self.n}.")
             return
 
         ix = np.where(self._RW == roll_width)
@@ -285,3 +304,5 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self._W = np.delete(self._W, ix)
         self._RW = np.delete(self._RW, ix)
         self._roll_widths.remove(roll_width)
+        merged_logger.info(
+            f"Removed {len(ix)} patterns for roll width {roll_width} from the existing patterns, now n={self.n}.")

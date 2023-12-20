@@ -10,8 +10,13 @@ from config.settings import GlulamConfig
 from utils.data_processor import GlulamDataProcessor
 from models.cutting_pattern import GlulamPatternProcessor, ExtendedGlulamPatternProcessor
 from models.pack_n_press import GlulamPackagingProcessor
+from utils.logger import setup_logger
+
+# Setup logger
+logger = setup_logger("UnitTest")
 
 
+# Your test cases
 class TestGlulamDataProcessor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
