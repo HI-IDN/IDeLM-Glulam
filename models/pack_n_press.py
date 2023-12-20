@@ -98,8 +98,8 @@ def pack_n_press(merged, number_of_presses, time_limit=GlulamConfig.GUROBI_TIME_
 
   # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
   # h1[k] will indicate that the height of region 0 is less than 24 layers
-  pmodel.addConstrs(h1[k] <= (24 - h[k, 0]) / 24 for j in J for k in K[:-1])
-  pmodel.addConstrs(Lp[k, r] >= 16000 - h1[k] * bigM - (1 - z[k, 1]) * bigM for j in J for r in R for k in K[:-1])
+  pmodel.addConstrs(h1[k] <= (24 - h[k, 0]) / 24 for k in K[:-1])
+  pmodel.addConstrs(Lp[k, r] >= 16000 - h1[k] * bigM - (1 - z[k, 1]) * bigM for r in R for k in K[:-1])
   pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
   # make sure that all pattern length in region 1 are smaller than those in region 0
@@ -159,13 +159,12 @@ def print_press_results(K, R, Lp_, h, Waste_):
   print(header)
 
   for k in K:
-      print(seperator_major if k == 0 else seperator_minor)
-      for r in R:
-          press_info = [f'{k}.{r}', np.round(Lp_[k, r]), np.round(h[k, r].X),
-                        f"{Waste_[k, r]:.2f}"]
-          print(row_format.format(*press_info))
+    print(seperator_major if k == 0 else seperator_minor)
+    for r in R:
+      press_info = [f'{k}.{r}', np.round(Lp_[k, r]), np.round(h[k, r].X),
+                    f"{Waste_[k, r]:.2f}"]
+      print(row_format.format(*press_info))
   print(seperator_major)
-
 
 def print_item_results(A, b, K, R, I, J, H, L, x, Lp, RW):
   """ Print the information about the items pressed. """
