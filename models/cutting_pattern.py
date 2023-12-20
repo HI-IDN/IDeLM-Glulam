@@ -24,11 +24,13 @@ class GlulamPatternProcessor:
                                                                f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
         # The starting cutting patterns for each order
         self._A = np.zeros((self.data.m, self.data.m * 2))
+        self._O = []
         self._H = np.zeros(self.data.m * 2)
         self._W = np.zeros(self.data.m * 2)
         self._RW = np.zeros(self.data.m * 2)
         for i in range(self.data.m):
             self._A[i, i] = 1
+            self._O.append(self.data.order[i])
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
             self._RW[i] = self._W[i]  # ro rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
@@ -47,6 +49,11 @@ class GlulamPatternProcessor:
     def A(self):
         """ Pattern matrix, a matrix of size m x n, where m is the number of orders and n is the number of patterns. """
         return self._A
+
+    @property
+    def O(self):
+        """ Order vector, a matrix of size m x 1, where m is the number of orders. """
+        return self._O
 
     @property
     def b(self):

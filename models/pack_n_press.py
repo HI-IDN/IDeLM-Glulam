@@ -98,7 +98,14 @@ class GlulamPackagingProcessor:
         A = self.A
         b = self.b
         RW = self.RW
-        # O = merged.O # binary indicator O[i,c] tells me if item i belongs to customer c
+
+        # Assuming merged.O is your array of order IDs
+        Oid = self.patterns.O
+        Ounique, inverse = np.unique(Oid, return_inverse=True)
+        O = np.zeros((len(Oid), len(Ounique)))
+        O[np.arange(len(Oid)), inverse] = 1
+        print(O.shape)
+        print(O)
 
         # parameters
         bigM = 1e8  # a big number
@@ -110,8 +117,6 @@ class GlulamPackagingProcessor:
         J = self.J
         K = self.K
         R = range(self._number_of_regions)  # regions
-
-        # C = range(O.shape[1])  # list of customers
 
         # model and solve parameters
         print("pack'n'press...")
@@ -141,8 +146,8 @@ class GlulamPackagingProcessor:
         F = pmodel.addVars(J, K, R)
         """ The surplus of pattern j in press k and region r. """
 
-        # Cp = pmodel.addVars(K,C)
-        # Ci = pmodel.addVars(K,C, vtype=GRB.BINARY)
+        Cp = pmodel.addVars(K, I)
+        Ci = pmodel.addVars(K, I, vtype=GRB.BINARY)
 
         # indicate if a pattern is used or not in press k region r
         pmodel.addConstrs(x1[j, k, r] * bigM >= x[j, k, r] for j in J for k in K for r in R)
