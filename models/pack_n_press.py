@@ -1,5 +1,4 @@
 import gurobipy as gp
-from gurobipy import GRB
 import numpy as np
 from config.settings import GlulamConfig
 
@@ -142,10 +141,10 @@ class GlulamPackagingProcessor:
         pmodel.setParam('TimeLimit', time_limit)
 
         # decision variables
-        x = pmodel.addVars(self.J, self.K, self.R, vtype=GRB.INTEGER)
+        x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
         """ The number of times pattern j is used in press k and region r. """
 
-        x1 = pmodel.addVars(self.J, self.K, self.R, vtype=GRB.BINARY)
+        x1 = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.BINARY)
         """ Whether pattern j is used in press k and region r."""
 
         h = pmodel.addVars(self.K, self.R)
@@ -154,10 +153,10 @@ class GlulamPackagingProcessor:
         Lp = pmodel.addVars(self.K, self.R)
         """ The length of each region. """
 
-        z = pmodel.addVars(self.K, self.R, vtype=GRB.BINARY)
+        z = pmodel.addVars(self.K, self.R, vtype=gp.GRB.BINARY)
         """ Whether press k is used in region r. """
 
-        h1 = pmodel.addVars(self.K, vtype=GRB.BINARY)
+        h1 = pmodel.addVars(self.K, vtype=gp.GRB.BINARY)
         """ Whether the height of region 0 in press k is less than MIN_HEIGHT_LAYER_REGION layers (i.e. 24 layers)."""
 
         F = pmodel.addVars(self.J, self.K, self.R)
@@ -217,13 +216,13 @@ class GlulamPackagingProcessor:
         # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
         pmodel.setObjective(
             gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)
-            , GRB.MINIMIZE)
+            , gp.GRB.MINIMIZE)
 
         # solve the model
         pmodel.optimize()
 
         # see if model is infeasible
-        if pmodel.status == GRB.INFEASIBLE:
+        if pmodel.status == gp.GRB.INFEASIBLE:
             print("The model is infeasible; quitting, increase number of presses")
             return
 
