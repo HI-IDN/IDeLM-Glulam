@@ -51,6 +51,10 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
         self.check_number_of_patterns(self.pattern, 34)
         self.check_number_of_patterns(self.pattern_smaller, 33)
 
+    def test_W(self):
+        self.assertTrue((self.data.widths @ self.pattern.A == self.pattern.W).all())
+        self.assertTrue((self.data.widths @ self.pattern_smaller.A == self.pattern_smaller.W).all())
+
     def test_demand(self):
         def check_demand(pattern):
             for width, quantity, demand in zip(pattern.data.widths, pattern.data.quantity, pattern.b):

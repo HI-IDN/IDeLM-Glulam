@@ -105,7 +105,6 @@ class GlulamPatternProcessor:
     @property
     def W(self):
         """ Pattern total width """
-        # return self.data.widths @ self._A
         return self._W
 
     def cutting_stock_column_generation(self):
@@ -145,9 +144,6 @@ class GlulamPatternProcessor:
             pi = [c.Pi for c in cut_model.getConstrs()]
             if GlulamConfig.SURPLUS_LIMIT > 0:  # Adjust the dual prices if surplus limit is used
                 pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]
-
-            # Remove columns in A[:,:] corresponding to x[j] = 0
-            # filter_unused_patterns(x)
 
             # Solve the column generation sub problem
             bailout = self._column_generation_subproblem(pi)
