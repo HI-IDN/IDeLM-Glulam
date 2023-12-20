@@ -182,10 +182,10 @@ class GlulamPackagingProcessor:
         # h1[k] will indicate that the height of region 0 is less than 24 layers
         pmodel.addConstrs(
             h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
-            for j in J for k in K[:-1])
+            for k in K[:-1])
         pmodel.addConstrs(
             Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
-            for j in J for r in R for k in K[:-1])
+            for r in R for k in K[:-1])
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * L[j] for j in J for r in R for k in K)
 
         # make sure that all pattern length in region 1 are smaller than those in region 0

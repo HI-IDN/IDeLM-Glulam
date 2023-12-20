@@ -102,12 +102,12 @@ class TestGlulamPackagingProcessor(unittest.TestCase):
         self.press.update_number_of_presses(7)
         Waste_, Lp_, RW_used, RW_counts, obj_val = self.press.pack_n_press(300)
         self.assertTrue(self.press.solved, "Seven presses are enough")
-        self.assertTrue(round(obj_val) <= 178920)
+        self.assertTrue(round(obj_val) == 33030, f'Objective was {obj_val}.')
 
         self.press.update_number_of_presses(6)
         Waste_, Lp_, RW_used, RW_counts, obj_val = self.press.pack_n_press(300)
         self.assertTrue(self.press.solved, "Six presses are enough")
-        self.assertTrue(round(obj_val) <= 52470)
+        self.assertTrue(round(obj_val) == 52470, f'Objective was {obj_val}.')
 
 
 # This allows running the tests directly from this script
