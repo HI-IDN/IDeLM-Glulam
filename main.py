@@ -22,13 +22,14 @@ def main(file_path, depth):
     wr = [25000, 23600, 24500, 23800, 22600]
 
     for i in range(0):
-        wr.append(np.floor((16000 + np.random.randint(0,
-                                                      9000)) / GlulamConfig.ROLL_WIDTH_TOLERANCE) * GlulamConfig.ROLL_WIDTH_TOLERANCE)
+        wr.append(np.floor(
+            (GlulamConfig.MAX_ROLL_WIDTH_REGION[1] +
+             np.random.randint(0, (GlulamConfig.MAX_ROLL_WIDTH_REGION[0] - GlulamConfig.MAX_ROLL_WIDTH_REGION[1]))) /
+            GlulamConfig.ROLL_WIDTH_TOLERANCE) * GlulamConfig.ROLL_WIDTH_TOLERANCE)
 
     # Generate cutting patterns
     merged = ExtendedGlulamPatternProcessor(data)
     logger.debug(f"Initial patterns have roll width {np.sort(merged.RW)} (n={merged.n})")
-
     roll_widths = [int(wr_) for wr_ in wr]
     for roll_width in roll_widths:
         logger.info(f"Generating cutting patterns for roll width: {roll_width}")

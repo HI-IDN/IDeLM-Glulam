@@ -106,26 +106,67 @@ class TestGlulamPackagingProcessor(unittest.TestCase):
             pattern.add_roll_width(roll_width)
         cls.press = GlulamPackagingProcessor(pattern)
 
-    def test_5_press(self):
+    def test_presses(self):
+        def check_constraints():
+            """
+            Helper function to verify constraints in the GlulamPackagingProcessor tests.
+            This method is NOT automatically invoked as a test.
+
+            This function checks:
+            1. If the demand is met by ensuring the product of A and x equals b.
+            2. If the maximum height is not exceeded.
+            3. If the minimum height is met for each region.
+            4. If the maximum roll width is not exceeded.
+            5. If the minimum roll width is met for each region.
+
+            """
+            # Check if demand is met
+            self.assertTrue(np.dot(self.press.A, np.sum(self.press.x, axis=(1, 2)) == self.press.b).all(),
+                            "Demand is not met.")
+
+            # Check if height is within bounds
+            self.assertTrue((self.press.h <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(), "Max height is exceeded.")
+            for region in self.press.R:
+                self.assertTrue(
+                    (np.sum(self.press.h[:, range(0, region + 1)], axis=1)[:-1] >=
+                     GlulamConfig.MIN_HEIGHT_LAYER_REGION[region]).all(), f"Min height is not met in region {region}.")
+
+            # Check if roll width is within bounds
+            self.assertTrue((self.press.Lp_estimated <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
+                            "Max roll width is exceeded.")
+            self.assertTrue((self.press.Lp_actual <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
+                            "Max roll width is exceeded.")
+            for region in self.press.R:
+                self.assertTrue(
+                    (self.press.Lp_estimated[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
+                    f"Max roll width is not met in region {region}, is {self.press.Lp_estimated[region]} "
+                    f">{GlulamConfig.MAX_ROLL_WIDTH_REGION[region]}.")
+                self.assertTrue(
+                    (self.press.Lp_actual[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
+                    f"Max roll width is not met in region {region}, is {self.press.Lp_actual[region]} "
+                    f">{GlulamConfig.MAX_ROLL_WIDTH_REGION[region]}.")
+                if region > 0:
+                    self.assertTrue(
+                        (self.press.Lp_estimated[:, region] < self.press.Lp_estimated[:, region - 1]).all(),
+                        f"Roll width is not decreasing in region {region}.")
+
         self.press.update_number_of_presses(5)
         self.press.pack_n_press(10)
         self.assertFalse(self.press.solved, "Five presses are not enough")
 
-    def test_7_press(self):
         self.press.update_number_of_presses(7)
         self.press.pack_n_press(420)
         self.assertTrue(self.press.solved, "Seven presses are enough")
         self.assertTrue(round(self.press.ObjectiveValue) == 33030, f'Objective was {self.press.ObjectiveValue}.')
         self.press.print_results()
-        self.assertTrue(np.dot(self.A, np.sum(self.x, axis=(1, 2)) == self.b).all(), "Demand is not met.")
+        check_constraints()
 
-    def test_6_presses(self):
         self.press.update_number_of_presses(6)
         self.press.pack_n_press(420)
         self.assertTrue(self.press.solved, "Six presses are enough")
         self.assertTrue(round(self.press.ObjectiveValue) == 52470, f'Objective was {self.press.ObjectiveValue}.')
         self.press.print_results()
-        self.assertTrue(np.dot(self.A, np.sum(self.x, axis=(1, 2)) == self.b).all(), "Demand is not met.")
+        check_constraints()
 
 
 # This allows running the tests directly from this script

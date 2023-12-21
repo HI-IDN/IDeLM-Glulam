@@ -8,6 +8,9 @@ from utils.logger import setup_logger
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
 
+# Set pandas options to display precision to 3 significant digits
+pd.set_option('display.precision', 3)
+
 
 class GlulamPackagingProcessor:
     def __init__(self, pattern_processor, number_of_presses=GlulamConfig.MAX_PRESSES):
@@ -31,10 +34,10 @@ class GlulamPackagingProcessor:
         self.Waste = None
         """ Waste in each press and each region, given in m^2. """
 
-        self.Lp = None
+        self.Lp_estimated = None
         """ The length of each region, given in mm. """
 
-        self.Lp_ = None
+        self.Lp_actual = None
         """ The actual length of each press, given in mm. """
 
         self.RW_used = None
@@ -136,8 +139,8 @@ class GlulamPackagingProcessor:
         self.RW_counts = False
         self.RW_used = False
         self.ObjectiveValue = None
-        self.Lp = None
-        self.Lp_ = None
+        self.Lp_estimated = None
+        self.Lp_actual = None
         self.Waste = None
         self.x = None
         self.h = None
@@ -249,16 +252,17 @@ class GlulamPackagingProcessor:
         logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
         logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
-        self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=float)
+        self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=int)
         logger.debug(f'h:\n{self.h}')
-        self.Lp = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
-        logger.debug(f'Lp:\n{self.Lp}')
+        self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
+        logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
 
         # Compute the waste
-        self.Lp_ = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
-        logger.debug(f'Lp_:\n{self.Lp_}')
-        self.Waste = np.sum(self.H[:, None, None] * (self.Lp[None, :, :] - self.L[:, None, None]) * self.x / 1000000,
-                            axis=0)  # Waste in m^2
+        self.Lp_actual = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
+        logger.debug(f'Lp actual:\n{self.Lp_actual}')
+        self.Waste = np.sum(
+            self.H[:, None, None] * (self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x / 1e6,
+            axis=0)  # Waste in m^2
         logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
         logger.debug(f'Waste:\n{self.Waste}')
 
@@ -268,31 +272,7 @@ class GlulamPackagingProcessor:
         self.table_set_I()
         self.table_set_J()
         self.table_set_K()
-        self.print_press_results()
         self.print_item_results()
-
-    def print_press_results(self):
-        if not self.solved:
-            return
-
-        """ Print the information about the presses. """
-        print("\n\nTable: Press Information\n")
-        row_format = "{:<5} {:>8} {:>6} {:>8}"
-        header = ['Press', 'Width', 'Height', 'TrueWaste']
-        header = row_format.format(*header)
-        seperator_minor = '-' * len(header)
-        seperator_major = '=' * len(header)
-
-        print(seperator_major)
-        print(header)
-
-        for k in self.K:
-            print(seperator_major if k == 0 else seperator_minor)
-            for r in self.R:
-                press_info = [f'{k}.{r}', self.Lp[k, r], self.h[k, r],
-                              f"{self.Waste[k, r]:.2f}"]
-                print(row_format.format(*press_info))
-        print(seperator_major)
 
     def print_item_results(self):
         if not self.solved:
@@ -329,12 +309,13 @@ class GlulamPackagingProcessor:
                     tot_press_height += self.x[j, k, r] * self.H[j] / GlulamConfig.LAYER_HEIGHT
                     for i in self.I:
                         if self.A[i, j] > 0:
-                            item_waste = self.H[j] * (self.Lp[k, r] - self.L[j]) * self.x[j, k, r] / 1000 / 1000
+                            item_waste = self.H[j] * (self.Lp_estimated[k, r] - self.L[j]) * self.x[
+                                j, k, r] / 1000 / 1000
                             item_used = self.x[j, k, r] * self.A[i, j]
                             pattern_used = self.x[j, k, r]
                             item_info = [f"{k}.{r}", i, self.b[i], f"{item_waste:.2f}", j, self.L[j],
                                          np.round(self.H[j] / GlulamConfig.LAYER_HEIGHT),
-                                         pattern_used, item_used, self.Lp[k, r], f"{self.RW[j]:.0f}"]
+                                         pattern_used, item_used, self.Lp_estimated[k, r], f"{self.RW[j]:.0f}"]
                             print(row_format.format(*item_info))
                             # Keep track of total values
                             tot_items.add(i)
@@ -388,7 +369,7 @@ class GlulamPackagingProcessor:
         logger.info(f'Pattern information: (n={self.patterns.n})')
 
         df = pd.DataFrame(
-            columns=['h', 'H', 'L', 'Area', 'PatFr', 'ItCr', 'TotIt'] + [f'P{k}' for k in self.K])
+            columns=['h', 'H', 'L', 'Area', 'PatFr', 'ItCr', 'TotIt', 'RW'] + [f'P{k}' for k in self.K])
         df['H'] = self.H
         df['h'] = (self.H / GlulamConfig.LAYER_HEIGHT).astype(int)
         df['L'] = self.L
@@ -396,6 +377,7 @@ class GlulamPackagingProcessor:
         df['PatFr'] = np.sum(self.x, axis=(1, 2))
         df['ItCr'] = np.sum(self.A, axis=0)
         df['TotIt'] = df['PatFr'] * df['ItCr']
+        df['RW'] = self.RW
 
         for k in self.K:
             df[f'P{k}'] = np.sum(self.x[:, k, :], axis=1)
@@ -412,11 +394,34 @@ class GlulamPackagingProcessor:
         """ Table pertaining to set K (of all presses). """
         logger.info(f'Press information: ({self.number_of_presses} number of presses)')
         df = pd.DataFrame(
-            columns=['Press', 'Region', 'h', 'H', 'L', 'Lp', 'Lp_', 'HxL', 'HxLp', 'Waste', 'Patterns', 'Items'])
-        df['Press'] = [f'{k}' for k in self.K for r in self.R]
-        df['Region'] = [f'{r}' for k in self.K for r in self.R]
-        df['Lp'] = [self.Lp[k, r] for k in self.K for r in self.R]
-        df['Lp_'] = [self.Lp_[k, r] for k in self.K for r in self.R]
+            columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
+        df['Press'] = [k for k in self.K for r in self.R]
+        df['Region'] = [r for k in self.K for r in self.R]
+        df['Lp'] = [self.Lp_estimated[k, r] for k in self.K for r in self.R]
+        df['Lp¹'] = [self.Lp_actual[k, r] for k in self.K for r in self.R]
+        df['h'] = [self.h[k, r] for k in self.K for r in self.R]
+        df['H'] = (df['h'] * GlulamConfig.LAYER_HEIGHT).astype(int)
+        df['HxLp'] = (df['H'] * df['Lp']) / 1e6
+        df['Area'] = [np.sum(self.H[:, None, None] * (self.L[:, None, None]) * self.x / 1e6, axis=0)[k, r]
+                      for k in self.K for r in self.R]
+        df['Waste'] = [self.Waste[k, r] for k in self.K for r in self.R]
+        df['Patterns'] = [np.sum(self.x[:, k, r]) for k in self.K for r in self.R]
+        df['Items'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.x, axis=(1, 0))[k, r]
+                       for k in self.K for r in self.R]
 
-        print("\n\nTable: Press Information\n")
+        print("\n\nTable: Press & Region Information\n")
         print(df)
+
+        df_ = df.groupby(['Press']).agg({'Area': 'sum', 'Waste': 'sum', 'Patterns': 'sum', 'Items': 'sum'})
+        print("\n\nTable: Press Information\n")
+        print(df_)
+
+        print('Lp (mm): Estimated length of press')
+        print('Lp¹ (mm): Actual length of press')
+        print('HxLp (m²): Estimated area of press')
+        print('HxLp¹ (m²): Actual area of press')
+        print('Waste (m²): Waste in press HxLp - ΣHxLj (pattern j in press)')
+        print(f'Total area of all presses: {np.sum(df["Area"]):.2f}m²')
+        print(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
+        print(f'Number of patterns in press: {np.sum(df["Patterns"])}')
+        print(f'Number of items in press: {np.sum(df["Items"])}')
