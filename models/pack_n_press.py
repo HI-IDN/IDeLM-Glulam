@@ -1,10 +1,9 @@
 import logging
-
+import pandas as pd
 import gurobipy as gp
 import numpy as np
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
-
 
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
@@ -111,7 +110,6 @@ class GlulamPackagingProcessor:
 
     # Define a function to process Gurobi logs
 
-
     def pack_n_press(self, time_limit=GlulamConfig.GUROBI_TIME_LIMIT):
         """
         Given a set of cutting patterns, pack them into presses such demand is fulfilled and the objective is
@@ -153,7 +151,6 @@ class GlulamPackagingProcessor:
 
         # Set time limit
         pmodel.setParam('TimeLimit', time_limit)
-
 
         # decision variables
         x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
@@ -266,6 +263,11 @@ class GlulamPackagingProcessor:
         logger.debug(f'Waste:\n{self.Waste}')
 
     def print_results(self):
+        if not self.solved:
+            return False
+        self.table_set_I()
+        self.table_set_J()
+        self.table_set_K()
         self.print_press_results()
         self.print_item_results()
 
@@ -351,16 +353,41 @@ class GlulamPackagingProcessor:
 
         print(seperator_major)
 
-    def table_press_info(self):
-        """ Table per press and true waste. """
-        # Tafla 1: press and true waste.
-        pass
+    def table_set_I(self):
+        """ Table pertaining to set I (of all items). """
+        logger.info(f'Item information: (m={self.patterns.m})')
 
-    def table_press_region_info(self):
-        """ Table per press and region - with patterns lenght heigh and max length. """
+        df = pd.DataFrame(
+            columns=['Order', 'D', 'W', 'H', 'h', 'b', 'Ax', 'Ax-b'] + [f'P{k}' for k in self.K])
+
+        df['Order'] = self.patterns.data.order
+        df['D'] = self.patterns.data.depth
+        df['W'] = self.patterns.data.widths
+        df['H'] = self.patterns.data.heights
+        df['h'] = self.patterns.data.layers
+        df['b'] = self.patterns.data.quantity
+        df['Ax'] = np.dot(self.A, np.sum(self.x, axis=(1, 2)))
+        for k in self.K:
+            df[f'P{k}'] = np.dot(self.A, np.sum(self.x[:, k, :], axis=1))  # A times sum of x over all regions
+        df['Ax-b'] = df['Ax'] - df['b']
+        if df['Ax-b'].sum() > 0:
+            logger.warning(f"Surplus is {df['Ax-b'].sum()} pieces; check model.")
+        if df['Ax-b'].sum() < 0:
+            logger.error(f"Deficit of {-df['Ax-b'].sum()} pieces; check model.")
+
+        print("\n\nTable: Item Information\n")
+        print(df)
+        row_format = "{:<17} {:>4} {:>4}"
+        logger.info(row_format.format('Total Items', 'm', str(self.patterns.m)))
+        logger.info(row_format.format('Total Production', 'Ax', str(np.sum(df['Ax']))))
+        logger.info(row_format.format('Total Demand', 'b', str(np.sum(df['b']))))
+        logger.info(row_format.format('Total Surplus', 'Ax-b', str(np.sum(df['Ax-b']))))
+
+    def table_set_J(self):
+        """ Table pertaining to set J (of all patterns). """
         # Tafla 2: press + region, patterns, length, height, og max length Lp(ekkert pseudo - area)
         pass
 
-    def table_press_item_order(self):
-        """ Table per item - what press they are in and what order. """
+    def table_set_K(self):
+        """ Table pertaining to set K (of all presses). """
         pass
