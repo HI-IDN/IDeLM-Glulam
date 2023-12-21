@@ -84,7 +84,7 @@ class GlulamPackagingProcessor:
 
     @property
     def b(self):
-        return self.patterns.b
+        return self.patterns.data.quantity
 
     @property
     def RW(self):
@@ -385,9 +385,38 @@ class GlulamPackagingProcessor:
 
     def table_set_J(self):
         """ Table pertaining to set J (of all patterns). """
-        # Tafla 2: press + region, patterns, length, height, og max length Lp(ekkert pseudo - area)
-        pass
+        logger.info(f'Pattern information: (n={self.patterns.n})')
+
+        df = pd.DataFrame(
+            columns=['h', 'H', 'L', 'Area', 'PatFr', 'ItCr', 'TotIt'] + [f'P{k}' for k in self.K])
+        df['H'] = self.H
+        df['h'] = (self.H / GlulamConfig.LAYER_HEIGHT).astype(int)
+        df['L'] = self.L
+        df['Area'] = self.H * self.L / 1000000
+        df['PatFr'] = np.sum(self.x, axis=(1, 2))
+        df['ItCr'] = np.sum(self.A, axis=0)
+        df['TotIt'] = df['PatFr'] * df['ItCr']
+
+        for k in self.K:
+            df[f'P{k}'] = np.sum(self.x[:, k, :], axis=1)
+
+        print("\n\nTable: Pattern Information\n")
+        print(df.sort_values(by=['TotIt', 'PatFr']))
+        print(f'Total patterns: n={self.patterns.n}')
+        print(f'Total Area of all Pattern (Σ HxL * PatFr) {np.sum(df["Area"] * df["PatFr"]):.2f}m²')
+        print(f'Pattern Usage Frequency (Σ PatFr) {np.sum(df["PatFr"])}')
+        print(f'Items Created by Pattern (Σ ItCr * PatFr) {np.sum(df["ItCr"] * df["PatFr"])}')
+        print(f'Total Items Produced (Σ TotIt) {np.sum(df["TotIt"])}')
 
     def table_set_K(self):
         """ Table pertaining to set K (of all presses). """
-        pass
+        logger.info(f'Press information: ({self.number_of_presses} number of presses)')
+        df = pd.DataFrame(
+            columns=['Press', 'Region', 'h', 'H', 'L', 'Lp', 'Lp_', 'HxL', 'HxLp', 'Waste', 'Patterns', 'Items'])
+        df['Press'] = [f'{k}' for k in self.K for r in self.R]
+        df['Region'] = [f'{r}' for k in self.K for r in self.R]
+        df['Lp'] = [self.Lp[k, r] for k in self.K for r in self.R]
+        df['Lp_'] = [self.Lp_[k, r] for k in self.K for r in self.R]
+
+        print("\n\nTable: Press Information\n")
+        print(df)

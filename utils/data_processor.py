@@ -19,20 +19,24 @@ class GlulamDataProcessor:
         self._filtered_data.reset_index(drop=True, inplace=True)
 
     @property
+    def depth(self):
+        return np.array(self._filtered_data['depth'].tolist(), dtype=int)
+
+    @property
     def widths(self):
-        return np.array(self._filtered_data['width'].tolist())
+        return np.array(self._filtered_data['width'].tolist(), dtype=int)
 
     @property
     def heights(self):
-        return np.array(self._filtered_data['height'].tolist())
+        return np.array(self._filtered_data['height'].tolist(), dtype=int)
 
     @property
     def layers(self):
-        return np.array(self._filtered_data['layers'].tolist())
+        return np.array(self._filtered_data['layers'].tolist(), dtype=int)
 
     @property
     def quantity(self):
-        return np.array(self._filtered_data['quantity'].tolist())
+        return np.array(self._filtered_data['quantity'].tolist(), dtype=int)
 
     @property
     def m(self):

@@ -68,6 +68,8 @@ class TestGlulamExtendedPatternProcessor(unittest.TestCase):
                 else:
                     self.assertEqual(demand, quantity, "b should equal quantity when width is within roll width")
 
+        self.assertTrue(self.pattern.roll_width == GlulamConfig.MAX_ROLL_WIDTH,
+                        f"Merged pattern should have 25M roll width not {self.pattern.roll_width}.")
         check_demand(self.pattern)
         check_demand(self.pattern_smaller)
 

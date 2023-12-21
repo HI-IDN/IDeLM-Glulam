@@ -42,7 +42,7 @@ class GlulamPatternProcessor:
             self._A[i, i] = 1
             self._H[i] = self.data.heights[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
-            self._RW[i] = self._W[i]  # ro rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
+            self._RW[i] = self._W[i]  # or rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
 
         # Create as many pieces as possible of each item
         for i in range(self.data.m):
@@ -217,23 +217,23 @@ class GlulamPatternProcessor:
         if knap_model.objval < -0.0000001:
 
             # Generate a new pattern based on the solution of the sub problem
-            new_pattern = np.array([[int(use[i].X)] for i in self.I])
+            new_pattern = np.array([[use[i].X] for i in self.I], dtype=int)
 
             # Append the new pattern to the existing pattern matrix A: This horizontally stacks the new pattern to
             # the end of the matrix
             self._A = np.hstack((self._A, new_pattern))
 
             # Append the height of the new pattern to the H array
-            self._H = np.concatenate((self._H, np.array([h.X])))
+            self._H = np.concatenate((self._H, np.array([h.X], dtype=int)))
 
             # Calculate the total width of the new pattern: This is done by summing the width of each item in the
             # pattern multiplied by its usage (use[i].X). Then, flatten the array to ensure it's a 1D array
-            W = np.array(np.sum([use[i].X * self.data.widths[i] for i in self.I])).flatten()
+            W = np.array(np.sum([use[i].X * self.data.widths[i] for i in self.I]), dtype=int).flatten()
             # Append this total width of the new pattern to the W array of existing widths
             self._W = np.concatenate((self._W, W))
 
             # Append the roll width to the R array
-            self._RW = np.concatenate((self._RW, np.array([self.roll_width])))
+            self._RW = np.concatenate((self._RW, np.array([self.roll_width], dtype=int)))
 
             single_logger.info(f"Added a new pattern; continuing the process (n={self.n}).")
             return False
