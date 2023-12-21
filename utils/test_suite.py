@@ -1,5 +1,6 @@
 import sys
 import os
+import numpy as np
 
 # Append project root directory to sys.path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,22 +106,26 @@ class TestGlulamPackagingProcessor(unittest.TestCase):
             pattern.add_roll_width(roll_width)
         cls.press = GlulamPackagingProcessor(pattern)
 
-    def test_press(self):
+    def test_5_press(self):
         self.press.update_number_of_presses(5)
         self.press.pack_n_press(10)
         self.assertFalse(self.press.solved, "Five presses are not enough")
 
+    def test_7_press(self):
         self.press.update_number_of_presses(7)
         self.press.pack_n_press(420)
         self.assertTrue(self.press.solved, "Seven presses are enough")
         self.assertTrue(round(self.press.ObjectiveValue) == 33030, f'Objective was {self.press.ObjectiveValue}.')
         self.press.print_results()
+        self.assertTrue(np.dot(self.A, np.sum(self.x, axis=(1, 2)) == self.b).all(), "Demand is not met.")
 
+    def test_6_presses(self):
         self.press.update_number_of_presses(6)
         self.press.pack_n_press(420)
         self.assertTrue(self.press.solved, "Six presses are enough")
         self.assertTrue(round(self.press.ObjectiveValue) == 52470, f'Objective was {self.press.ObjectiveValue}.')
         self.press.print_results()
+        self.assertTrue(np.dot(self.A, np.sum(self.x, axis=(1, 2)) == self.b).all(), "Demand is not met.")
 
 
 # This allows running the tests directly from this script
