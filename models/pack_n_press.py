@@ -143,6 +143,7 @@ class GlulamPackagingProcessor:
         self.Lp_actual = None
         self.Waste = None
         self.x = None
+        self.xn = None
         self.h = None
 
         # parameters
@@ -243,7 +244,8 @@ class GlulamPackagingProcessor:
 
         # Extract the results
         self.solved = True
-        self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
+        self.x = np.array([[[x[j, k, r].X>0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
+        self.xn = np.array([[[x[j, k, r].X for r in self.R] for k in self.K] for j in self.J])
         self.RW_used, self.RW_counts = np.unique(
             [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
             return_counts=True)
@@ -306,12 +308,12 @@ class GlulamPackagingProcessor:
 
             for j in self.J:
                 if self.x[j, k, r]:
-                    tot_press_height += self.x[j, k, r] * self.H[j] / GlulamConfig.LAYER_HEIGHT
+                    tot_press_height += self.xn[j, k, r] * self.H[j] / GlulamConfig.LAYER_HEIGHT
                     for i in self.I:
                         if self.A[i, j] > 0:
                             item_waste = self.H[j] * (self.Lp_estimated[k, r] - self.L[j]) * self.x[
                                 j, k, r] / 1000 / 1000
-                            item_used = self.x[j, k, r] * self.A[i, j]
+                            item_used = self.xn[j, k, r] * self.A[i, j]
                             pattern_used = self.x[j, k, r]
                             item_info = [f"{k}.{r}", i, self.b[i], f"{item_waste:.2f}", j, self.L[j],
                                          np.round(self.H[j] / GlulamConfig.LAYER_HEIGHT),
@@ -347,9 +349,10 @@ class GlulamPackagingProcessor:
         df['H'] = self.patterns.data.heights
         df['h'] = self.patterns.data.layers
         df['b'] = self.patterns.data.quantity
-        df['Ax'] = np.dot(self.A, np.sum(self.x, axis=(1, 2)))
+        #xj = np.array([np.sum([x[j,k,r].X for k in self.K for r in self.R]) for j in self.J])
+        df['Ax'] = np.dot(self.A, np.sum(self.xn, axis=(1, 2)))
         for k in self.K:
-            df[f'P{k}'] = np.dot(self.A, np.sum(self.x[:, k, :], axis=1))  # A times sum of x over all regions
+            df[f'P{k}'] = np.dot(self.A, np.sum(self.xn[:, k, :], axis=1))  # A times sum of x over all regions
         df['Ax-b'] = df['Ax'] - df['b']
         if df['Ax-b'].sum() > 0:
             logger.warning(f"Surplus is {df['Ax-b'].sum()} pieces; check model.")
@@ -374,7 +377,7 @@ class GlulamPackagingProcessor:
         df['h'] = (self.H / GlulamConfig.LAYER_HEIGHT).astype(int)
         df['L'] = self.L
         df['Area'] = self.H * self.L / 1000000
-        df['PatFr'] = np.sum(self.x, axis=(1, 2))
+        df['PatFr'] = np.sum(self.xn, axis=(1, 2))
         df['ItCr'] = np.sum(self.A, axis=0)
         df['TotIt'] = df['PatFr'] * df['ItCr']
         df['RW'] = self.RW
@@ -405,8 +408,8 @@ class GlulamPackagingProcessor:
         df['Area'] = [np.sum(self.H[:, None, None] * (self.L[:, None, None]) * self.x / 1e6, axis=0)[k, r]
                       for k in self.K for r in self.R]
         df['Waste'] = [self.Waste[k, r] for k in self.K for r in self.R]
-        df['Patterns'] = [np.sum(self.x[:, k, r]) for k in self.K for r in self.R]
-        df['Items'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.x, axis=(1, 0))[k, r]
+        df['Patterns'] = [np.sum(self.xn[:, k, r]) for k in self.K for r in self.R]
+        df['Items'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.xn, axis=(1, 0))[k, r]
                        for k in self.K for r in self.R]
 
         print("\n\nTable: Press & Region Information\n")
