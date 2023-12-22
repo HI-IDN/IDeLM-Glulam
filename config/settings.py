@@ -12,13 +12,13 @@ class GlulamConfig:
     MAX_PRESSES = 7  # maximum number of presses
 
     # Cutting pattern settings
-    SURPLUS_LIMIT = .1  # in pieces
+    SURPLUS_LIMIT = .10  # in pieces
     ROLL_WIDTH_TOLERANCE = 100  # in mm
 
     # Other settings
     DEFAULT_DEPTH = 115  # in mm
 
     # Algorithm settings
-    GUROBI_TIME_LIMIT = 420  # in seconds, 7 minutes
+    GUROBI_TIME_LIMIT = 2*60  # in seconds, 7 minutes
     GUROBI_OUTPUT_FLAG = 1  # 0: silent, 1: summary, 2: detailed, 3: verbose
     VERBOSE_LOGGING = True

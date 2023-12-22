@@ -7,7 +7,7 @@ from models.pack_n_press import GlulamPackagingProcessor
 from config.settings import GlulamConfig
 import numpy as np
 from utils.logger import setup_logger
-
+import pickle
 
 def main(file_path, depth):
     logger = setup_logger('IDeLM-Glulam')
@@ -35,8 +35,11 @@ def main(file_path, depth):
         logger.info(f"Generating cutting patterns for roll width: {roll_width}")
         merged.add_roll_width(roll_width)
         logger.info(f"Number of patterns: {merged.n}")
-
-    press = GlulamPackagingProcessor(merged, 0)
+    with open('file.pkl', 'wb') as file: 
+        pickle.dump(merged, file) 
+    with open('file.pkl', 'rb') as file: 
+        merged = pickle.load(file) 
+    press = GlulamPackagingProcessor(merged, 5)
     while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
         press.update_number_of_presses(press.number_of_presses + 1)
         press.pack_n_press()
