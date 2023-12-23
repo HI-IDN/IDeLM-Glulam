@@ -26,7 +26,7 @@ def main(file_path, depth):
         roll_widths.append(np.random.randint(20000, 25000))
     best_solution = (100000,100000)
     num_generations = 10
-    WR = np.zeros((num_generations, num_roll_widths))
+    WR = np.zeros((num_generations+1, num_roll_widths))
     WR[0,:] = roll_widths
     for gen in range(1,num_generations+1):
         # Generate cutting patterns
@@ -61,7 +61,10 @@ def main(file_path, depth):
                 merged.remove_roll_width(rw)
                 print("A.shape=", merged.A.shape)
                 WR[gen-1,i] = -WR[gen-1,i]
-                roll_widths[i] = np.random.randint(20000, 25000) # need to play around with this search operator
+                roll_widths[i] = np.random.randint(10000, 25000) # need to play around with this search operator
+        # now find one roll_width that is being used and replace it with a new one
+        i = np.where(WR[gen-1,:] > 0)
+        roll_widths[i] = np.random.randint(10000, 25000)
         WR[gen,:] = roll_widths
             #print(roll_widths)
             #print(press.RW_used)
