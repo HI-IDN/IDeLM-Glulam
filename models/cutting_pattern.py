@@ -140,6 +140,7 @@ class GlulamPatternProcessor:
             cut_model.setObjective(gp.quicksum(x[j] for j in self.J), gp.GRB.MINIMIZE)
 
             # Constraints: Ensure all orders are satisfied
+            ci = 0
             cut_model.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
                                  for i in self.I)
             # Constraints: Ensure no more than MAX_SURPLUS_QUANTITY pieces are left over
@@ -214,7 +215,7 @@ class GlulamPatternProcessor:
             return True
 
         # Check if a new pattern with negative reduced cost is found
-        if knap_model.objval < -0.0000001:
+        if knap_model.objval < -0.00000001:
 
             # Generate a new pattern based on the solution of the sub problem
             new_pattern = np.array([[use[i].X] for i in self.I], dtype=int)

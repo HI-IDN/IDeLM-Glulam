@@ -9,7 +9,7 @@ class GlulamConfig:
     LAYER_HEIGHT = 45.0  # in mm
     MAX_HEIGHT_LAYERS = 26  # number of layers
     MIN_HEIGHT_LAYER_REGION = [11, 24]  # Region 0 must be at least 11 layers, Region 1 must be at least 24 layers
-    MAX_PRESSES = 7  # maximum number of presses
+    MAX_PRESSES = 8  # maximum number of presses
 
     # Cutting pattern settings
     SURPLUS_LIMIT = .10  # in pieces
@@ -19,6 +19,6 @@ class GlulamConfig:
     DEFAULT_DEPTH = 115  # in mm
 
     # Algorithm settings
-    GUROBI_TIME_LIMIT = 2*60  # in seconds, 7 minutes
+    GUROBI_TIME_LIMIT = 2*60  # in seconds, 2 minutes
     GUROBI_OUTPUT_FLAG = 1  # 0: silent, 1: summary, 2: detailed, 3: verbose
     VERBOSE_LOGGING = True
