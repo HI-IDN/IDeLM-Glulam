@@ -43,3 +43,28 @@ for param in parameter_names:
 
 with open('gurobi_settings.pkl', 'wb') as file: 
     pickle.dump(Info, file)
+
+with open('gurobi_settings_.pkl', 'rb') as file: 
+    Info_ = pickle.load(file)
+
+# Create a new model to test
+model_ = gp.Model()
+
+for param, values in Info_.items():
+    try:
+        info = model.getParamInfo(param)
+        try:
+            current_value = info[2]
+        except:
+            current_value = info
+        # Extract the current value of the parameter (third element in the tuple)
+        try:
+            new_value = values[2]  # The third element is the current value
+        except:
+            new_value = values
+        
+        print(f"Setting {param} to {new_value} and it was {current_value}")
+        #model_.setParam(param, current_value)
+    except gp.GurobiError as e:
+        print(f"Error setting parameter {param}: {e}")
+        
