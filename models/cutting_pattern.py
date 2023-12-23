@@ -56,7 +56,7 @@ class GlulamPatternProcessor:
 
         self._remove_duplicate_patterns()
 
-        single_logger.info(f"Added {self.n} unique initial patterns.")
+        #single_logger.info(f"Added {self.n} unique initial patterns.")
 
     @property
     def A(self):
@@ -236,11 +236,11 @@ class GlulamPatternProcessor:
             # Append the roll width to the R array
             self._RW = np.concatenate((self._RW, np.array([self.roll_width], dtype=int)))
 
-            single_logger.info(f"Added a new pattern; continuing the process (n={self.n}).")
+            #single_logger.info(f"Added a new pattern; continuing the process (n={self.n}).")
             return False
         else:
-            single_logger.info(
-                f"No more patterns with negative reduced cost found; quitting the process with n={self.n}.")
+            #single_logger.info(
+            #    f"No more patterns with negative reduced cost found; quitting the process with n={self.n}.")
             return True
 
     def _remove_duplicate_patterns(self):
@@ -266,7 +266,7 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         """
         super().__init__(data, roll_width=None)  # Initialize the base class
         self._roll_widths = set()
-        merged_logger.info(f"Initialising Extended Glulam Pattern Processor instance with {self.n} patterns.")
+        #merged_logger.info(f"Initialising Extended Glulam Pattern Processor instance with {self.n} patterns.")
 
     @property
     def roll_widths(self):
@@ -288,8 +288,8 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self._RW = np.concatenate((self._RW, pattern.RW))
         self._remove_duplicate_patterns()
         self._roll_widths.add(roll_width)
-        merged_logger.info(
-            f"Added {pattern.n} patterns for roll width {roll_width} to the existing patterns, now n={self.n}.")
+        #merged_logger.info(
+        #    f"Added {pattern.n} patterns for roll width {roll_width} to the existing patterns, now n={self.n}.")
 
     def remove_roll_width(self, roll_width):
         """

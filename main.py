@@ -20,15 +20,18 @@ def main(file_path, depth):
 
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
-    wr = []
-    for i in range(8):
-        wr.append(np.random.randint(20000, 25000))
+    roll_widths = []
+    num_roll_widths = 8
+    for i in range(num_roll_widths):
+        roll_widths.append(np.random.randint(20000, 25000))
     best_solution = (100000,100000)
-    for gen in range(10):
+    num_generations = 10
+    WR = np.zeros((num_generations, num_roll_widths))
+    WR[0,:] = roll_widths
+    for gen in range(1,num_generations+1):
         # Generate cutting patterns
         merged = ExtendedGlulamPatternProcessor(data)
         #logger.debug(f"Initial patterns have roll width {np.sort(merged.RW)} (n={merged.n})")
-        roll_widths = [int(wr_) for wr_ in wr]
         for roll_width in roll_widths:
             #logger.info(f"Generating cutting patterns for roll width: {roll_width}")
             merged.add_roll_width(roll_width)
@@ -57,14 +60,18 @@ def main(file_path, depth):
                 print(f"rollwidth {rw} is not used, remove it from the list of roll widths")
                 merged.remove_roll_width(rw)
                 print("A.shape=", merged.A.shape)
+                WR[gen-1,i] = -WR[gen-1,i]
                 roll_widths[i] = np.random.randint(20000, 25000) # need to play around with this search operator
-            print(roll_widths)
-            print(press.RW_used)
-            print(press.RW_counts)
+        WR[gen,:] = roll_widths
+            #print(roll_widths)
+            #print(press.RW_used)
+            #print(press.RW_counts)
 
     print(press.Waste)
     print("total waste = ", press.TotalWaste)
-
+    # save the matrix WR using pickle
+    with open('WR.pkl', 'wb') as f:
+        pickle.dump(WR, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glulam Production Optimizer")
