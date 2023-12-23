@@ -63,7 +63,7 @@ def main(file_path, depth):
                 WR[gen-1,i] = -WR[gen-1,i]
                 roll_widths[i] = np.random.randint(10000, 25000) # need to play around with this search operator
         # now find one roll_width that is being used and replace it with a new one
-        i = int(np.where(WR[gen-1,:] > 0)[0])
+        i = int(np.where(WR[gen-1,:] > 0)[0][0])
         roll_widths[i] = np.random.randint(10000, 25000)
         WR[gen,:] = roll_widths
             #print(roll_widths)
