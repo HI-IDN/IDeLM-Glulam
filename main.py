@@ -39,14 +39,14 @@ def main(file_path, depth):
 
         new_press = GlulamPackagingProcessor(merged, 4)
         while not new_press.solved and new_press.number_of_presses < GlulamConfig.MAX_PRESSES:
-            new_press.update_number_of_presses(press.number_of_presses + 1)
+            new_press.update_number_of_presses(new_press.number_of_presses + 1)
             result = new_press.pack_n_press()
             if result == True:
                 new_press.print_results()
             if new_press.solved:
-                logger.info(f"Optimization completed successfully for {press.number_of_presses} presses.")
+                logger.info(f"Optimization completed successfully for {new_press.number_of_presses} presses.")
             else:
-                logger.warning(f"Optimization did not reach a solution within {press.number_of_presses} presses.")
+                logger.warning(f"Optimization did not reach a solution within {new_press.number_of_presses} presses.")
         if result == True:
             press = new_press
         else:
