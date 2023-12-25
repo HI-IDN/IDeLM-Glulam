@@ -21,11 +21,11 @@ def main(file_path, depth):
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
     roll_widths = []
-    num_roll_widths = 8
+    num_roll_widths = 10
     for i in range(num_roll_widths):
         roll_widths.append(np.random.randint(20000, 25000))
     best_solution = (100000,100000)
-    num_generations = 10
+    num_generations = 100
     WR = np.zeros((num_generations+1, num_roll_widths))
     WR[0,:] = roll_widths
     for gen in range(1,num_generations+1):
@@ -37,15 +37,20 @@ def main(file_path, depth):
             merged.add_roll_width(roll_width)
             #logger.info(f"Number of patterns: {merged.n}")
 
-        press = GlulamPackagingProcessor(merged, 4)
-        while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
-            press.update_number_of_presses(press.number_of_presses + 1)
-            press.pack_n_press()
-            press.print_results()
-            if press.solved:
+        new_press = GlulamPackagingProcessor(merged, 4)
+        while not new_press.solved and new_press.number_of_presses < GlulamConfig.MAX_PRESSES:
+            new_press.update_number_of_presses(press.number_of_presses + 1)
+            result = new_press.pack_n_press()
+            if result == True:
+                new_press.print_results()
+            if new_press.solved:
                 logger.info(f"Optimization completed successfully for {press.number_of_presses} presses.")
             else:
                 logger.warning(f"Optimization did not reach a solution within {press.number_of_presses} presses.")
+        if result == True:
+            press = new_press
+        else:
+            roll_widths = [np.abs(WR[gen-1,i]) for i in range(num_roll_widths)]
         if ((best_solution[0] > press.TotalWaste) and (best_solution[1] <= press.number_of_presses)) or (best_solution[1] > press.number_of_presses):
             best_solution = (press.TotalWaste, press.number_of_presses)
             logger.info(f"Number of patterns (current best): {merged.n}")
@@ -75,6 +80,8 @@ def main(file_path, depth):
     # save the matrix WR using pickle
     with open('WR.pkl', 'wb') as f:
         pickle.dump(WR, f)
+    with open('WR.pkl', 'rb') as f:
+        WR = pickle.load(f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glulam Production Optimizer")
