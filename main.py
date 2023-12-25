@@ -45,6 +45,7 @@ def main(file_path, depth):
                 new_press.print_results()
             if new_press.solved:
                 logger.info(f"Optimization completed successfully for {new_press.number_of_presses} presses.")
+                press = new_press
             else:
                 logger.warning(f"Optimization did not reach a solution within {new_press.number_of_presses} presses.")
         if result == True:
