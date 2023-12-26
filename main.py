@@ -27,7 +27,8 @@ def main(file_path, depth):
     best_solution = (100000,100000)
     num_generations = 100
     WR = np.zeros((num_generations+1, num_roll_widths))
-    WR[0,:] = roll_widths
+    OBJ = np.zeros((num_generations+1, 2))
+    WR[0,:] = -roll_widths
     for gen in range(1,num_generations+1):
         # Generate cutting patterns
         merged = ExtendedGlulamPatternProcessor(data)
@@ -37,44 +38,46 @@ def main(file_path, depth):
             merged.add_roll_width(roll_width)
             #logger.info(f"Number of patterns: {merged.n}")
 
-        new_press = GlulamPackagingProcessor(merged, 4)
-        while not new_press.solved and new_press.number_of_presses < GlulamConfig.MAX_PRESSES:
-            new_press.update_number_of_presses(new_press.number_of_presses + 1)
-            result = new_press.pack_n_press()
-            if result == True:
-                new_press.print_results()
-            if new_press.solved:
-                logger.info(f"Optimization completed successfully for {new_press.number_of_presses} presses.")
-                press = new_press
+        press = GlulamPackagingProcessor(merged, 4)
+        while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
+            press.update_number_of_presses(press.number_of_presses + 1)
+            press.pack_n_press()
+            if press.solved:
+                press.print_results()
+                logger.info(f"Optimization completed successfully for {press.number_of_presses} presses.")
             else:
-                logger.warning(f"Optimization did not reach a solution within {new_press.number_of_presses} presses.")
-        if result == True:
-            press = new_press
-        else:
+                logger.warning(f"Optimization did not reach a solution within {press.number_of_presses} presses.")
+        if False == press.solved:
             roll_widths = [np.abs(WR[gen-1,i]) for i in range(num_roll_widths)]
-        if ((best_solution[0] > press.TotalWaste) and (best_solution[1] <= press.number_of_presses)) or (best_solution[1] > press.number_of_presses):
-            best_solution = (press.TotalWaste, press.number_of_presses)
-            logger.info(f"Number of patterns (current best): {merged.n}")
-            logger.info(f"Best total waste so far: {best_solution[0]} with {best_solution[1]} presses.")
+            for i in range(len(roll_widths)):
+                if WR[gen-1,i] < 0:
+                    roll_widths[i] = np.random.randint(10000, 25000)
+            OBJ[gen-1,:] = (None, None) # basically failed to find anything
+            WR[gen,:] = WR[gen-1,:] # keep the last successful roll widths
+        else:
+            OBJ[gen-1,:] = (press.TotalWaste, press.number_of_presses)
+            if ((best_solution[0] > press.TotalWaste) and (best_solution[1] <= press.number_of_presses)) or (best_solution[1] > press.number_of_presses):
+                best_solution = (press.TotalWaste, press.number_of_presses)
+                logger.info(f"GREP: Number of patterns (current best): {merged.n}")
+                logger.info(f"GREP: Best total waste so far: {best_solution[0]} with {best_solution[1]} presses.")
             # dump using pickle the current best solution, that is merged and press
             with open('best_solution.pkl'+str(gen), 'wb') as f:
                 pickle.dump((merged, press), f)
-        # summarize how many and which rolls are used
-        for i in range(len(roll_widths)):
-            rw = roll_widths[i]
-            if rw not in press.RW_used:
-                print(f"rollwidth {rw} is not used, remove it from the list of roll widths")
-                merged.remove_roll_width(rw)
-                print("A.shape=", merged.A.shape)
-                WR[gen-1,i] = -WR[gen-1,i]
-                roll_widths[i] = np.random.randint(10000, 25000) # need to play around with this search operator
+        # extract the roll widths used in the current solution and mutate
+            for i in range(len(roll_widths)):
+                rw = roll_widths[i]
+                if rw not in press.RW_used:
+                    print(f"rollwidth {rw} is not used, remove it from the list of roll widths")
+                    merged.remove_roll_width(rw)
+                    print("A.shape=", merged.A.shape)
+                    WR[gen-1,i] = -WR[gen-1,i]
+                    roll_widths[i] = np.random.randint(10000, 25000) # need to play around with this search operator
         # now find one roll_width that is being used and replace it with a new one
-        i = int(np.where(WR[gen-1,:] > 0)[0][0])
-        roll_widths[i] = np.random.randint(10000, 25000)
-        WR[gen,:] = roll_widths
-            #print(roll_widths)
-            #print(press.RW_used)
-            #print(press.RW_counts)
+        if np.any(WR[gen-1,:] > 0):
+            i = int(np.where(WR[gen-1,:] > 0)[0][0])
+            roll_widths[i] = np.random.randint(10000, 25000)
+        if press.solved:
+            WR[gen,:] = roll_widths
 
     print(press.Waste)
     print("total waste = ", press.TotalWaste)

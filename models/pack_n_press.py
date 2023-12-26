@@ -240,7 +240,13 @@ class GlulamPackagingProcessor:
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
             logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
-            return
+            return False
+
+        try:
+            assert x[0, 0, 0].X>0.1
+        except:
+            logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
+            return False
 
         # Extract the results
         self.solved = True
@@ -267,6 +273,7 @@ class GlulamPackagingProcessor:
             axis=0)  # Waste in m^2
         #logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
         #logger.debug(f'Waste:\n{self.Waste}')
+        return True
 
     def print_results(self):
         if not self.solved:
