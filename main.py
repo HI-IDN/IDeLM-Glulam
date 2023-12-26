@@ -38,7 +38,7 @@ def main(file_path, depth):
             merged.add_roll_width(roll_width)
             #logger.info(f"Number of patterns: {merged.n}")
 
-        press = GlulamPackagingProcessor(merged, 4)
+        press = GlulamPackagingProcessor(merged, GlulamConfig.MIN_PRESSES)
         while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
             press.update_number_of_presses(press.number_of_presses + 1)
             press.pack_n_press()
