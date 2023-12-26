@@ -64,15 +64,24 @@ def main(file_path, depth):
             for i in range(len(roll_widths)):
                 rw = roll_widths[i]
                 if rw not in press.RW_used:
-                    print(f"rollwidth {rw} is not used, remove it from the list of roll widths")
                     merged.remove_roll_width(rw)
-                    print("A.shape=", merged.A.shape)
                     WR[gen-1,i] = -WR[gen-1,i]
-                    roll_widths[i] = np.random.randint(10000, 25000) # need to play around with this search operator
+            for i in range(len(roll_widths)):
+                if WR[gen-1,i] < 0:
+                    j = int(np.where(WR[gen-1,:] > 0)[0][0])
+                    print("j = ", j)
+                    roll_widths[i] = roll_widths[j] + np.random.choice(np.arange(-500, 501, GlulamConfig.ROLL_WIDTH_TOLERANCE)) # need to play around with this search operator
+                    print("mutated rollwidhts", i, "is", roll_widths[i], "and j is", j)
+                    while roll_widths[i] <= 0:
+                        j = int(np.where(WR[gen-1,:] > 0)[0][0])
+                        print("j = ", j)
+                        roll_widths[i] = roll_widths[j] + np.random.choice(np.arange(-500, 501, GlulamConfig.ROLL_WIDTH_TOLERANCE)) # need to play around with this search operator
+                        print("mutated rollwidhts", i, "is", roll_widths[i], "and j is", j)
         # now find one roll_width that is being used and replace it with a new one
         if np.any(WR[gen-1,:] > 0):
-            i = int(np.where(WR[gen-1,:] > 0)[0][0])
-            roll_widths[i] = np.random.randint(10000, 25000)
+            if np.random.rand() < 0.1:
+                i = int(np.where(WR[gen-1,:] > 0)[0][0])
+                roll_widths[i] = np.random.randint(10000, 25000)
         if press.solved:
             WR[gen,:] = roll_widths
          # dump using pickle the current best solution, that is merged and press
