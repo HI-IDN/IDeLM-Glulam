@@ -28,7 +28,7 @@ def main(file_path, depth):
     num_generations = 100
     WR = np.zeros((num_generations+1, num_roll_widths))
     OBJ = np.zeros((num_generations+1, 2))
-    WR[0,:] = -roll_widths
+    WR[0,:] = [-rw for rw in roll_widths]
     for gen in range(1,num_generations+1):
         # Generate cutting patterns
         merged = ExtendedGlulamPatternProcessor(data)
