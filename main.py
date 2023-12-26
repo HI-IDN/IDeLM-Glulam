@@ -72,7 +72,7 @@ def main(file_path, depth):
                     print("j = ", j)
                     roll_widths[i] = roll_widths[j] + np.random.choice(np.arange(-500, 501, GlulamConfig.ROLL_WIDTH_TOLERANCE)) # need to play around with this search operator
                     print("mutated rollwidhts", i, "is", roll_widths[i], "and j is", j)
-                    while roll_widths[i] <= 0:
+                    while roll_widths[i] <= 0 and roll_widths[i] not in press.RW_used:
                         j = int(np.where(WR[gen-1,:] > 0)[0][0])
                         print("j = ", j)
                         roll_widths[i] = roll_widths[j] + np.random.choice(np.arange(-500, 501, GlulamConfig.ROLL_WIDTH_TOLERANCE)) # need to play around with this search operator
