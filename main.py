@@ -20,7 +20,7 @@ def main(file_path, depth):
 
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
-    roll_widths = wr # []
+    roll_widths = []
     num_roll_widths = 10 
     for i in range(num_roll_widths-len(roll_widths)):
         roll_widths.append(np.random.randint(20000, 25000))
@@ -68,7 +68,7 @@ def main(file_path, depth):
                     WR[gen-1,i] = -WR[gen-1,i]
             for i in range(len(roll_widths)):
                 if WR[gen-1,i] < 0:
-                    j = int(np.where(WR[gen-1,:] > 0)[0][0])
+                    j = np.random.choice(np.where(WR[gen-1,:] > 0)[0])
                     print("j = ", j)
                     roll_widths[i] = roll_widths[j] + np.random.choice(np.arange(-500, 501, GlulamConfig.ROLL_WIDTH_TOLERANCE)) # need to play around with this search operator
                     print("mutated rollwidhts", i, "is", roll_widths[i], "and j is", j)
