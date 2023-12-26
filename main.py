@@ -56,7 +56,7 @@ def main(file_path, depth):
             WR[gen,:] = WR[gen-1,:] # keep the last successful roll widths
         else:
             OBJ[gen-1,:] = (press.TotalWaste, press.number_of_presses)
-            if ((best_solution[0] > press.TotalWaste) and (best_solution[1] <= press.number_of_presses)) or (best_solution[1] > press.number_of_presses):
+            if ((best_solution[0] > press.TotalWaste) and (best_solution[1] >= press.number_of_presses)) or (best_solution[1] > press.number_of_presses):
                 best_solution = (press.TotalWaste, press.number_of_presses)
                 logger.info(f"GREP: Number of patterns (current best): {merged.n}")
                 logger.info(f"GREP: Best total waste so far: {best_solution[0]} with {best_solution[1]} presses.")
