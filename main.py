@@ -60,9 +60,6 @@ def main(file_path, depth):
                 best_solution = (press.TotalWaste, press.number_of_presses)
                 logger.info(f"GREP: Number of patterns (current best): {merged.n}")
                 logger.info(f"GREP: Best total waste so far: {best_solution[0]} with {best_solution[1]} presses.")
-        # dump using pickle the current best solution, that is merged and press
-        with open('best_solution.pkl'+str(gen), 'wb') as f:
-            pickle.dump((merged, press), f)
         # extract the roll widths used in the current solution and mutate
             for i in range(len(roll_widths)):
                 rw = roll_widths[i]
@@ -78,6 +75,9 @@ def main(file_path, depth):
             roll_widths[i] = np.random.randint(10000, 25000)
         if press.solved:
             WR[gen,:] = roll_widths
+         # dump using pickle the current best solution, that is merged and press
+        with open('best_solution.pkl'+str(gen), 'wb') as f:
+            pickle.dump((merged, press), f)
         print(WR)
     print(press.Waste)
     print("total waste = ", press.TotalWaste)
