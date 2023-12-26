@@ -21,8 +21,8 @@ def main(file_path, depth):
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
     roll_widths = wr # []
-    num_roll_widths = 10 - len(roll_widths)
-    for i in range(num_roll_widths):
+    num_roll_widths = 10 
+    for i in range(num_roll_widths-len(roll_widths)):
         roll_widths.append(np.random.randint(20000, 25000))
     best_solution = (100000,100000)
     num_generations = 100

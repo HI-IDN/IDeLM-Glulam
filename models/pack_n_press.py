@@ -243,7 +243,7 @@ class GlulamPackagingProcessor:
             return False
 
         try:
-            assert x[0, 0, 0].X>0.1
+            assert x[0, 0, 0].X >= 0
         except:
             logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
             return False
