@@ -22,13 +22,14 @@ def mernd(S, n=None):
 # the mutation operator should create a new vector x_ and a new vector s_
 # the values in x_ should be unique note that we may re-create a parent in this case
 # the Search algorithm should delete the parent and replace it with the child !?
-def Mutate(x, s, tau, nmin, nmax, dn):
+def Mutate(x, s, tau, tau_, nmin, nmax, dn):
     x_ = np.zeros(len(x))
     s_ = s.copy()
+    eta1 = tau_*np.random.randn() # global steps size
     for i in range(len(x)):
-        s_[i] = s[i]*np.exp(tau*np.random.randn())
+        s_[i] = s[i]*np.exp(eta1+tau*np.random.randn())
         retry = 0
-        while x_[i] == 0 or x_[i] < nmin or x_[i] > nmax or x_[i] in x_[:i] or x_[i] in x:
+        while x_[i] == 0 or x_[i] < nmin or x_[i] > nmax or x_[i] in x_[:i]: # or x_[i] in x:
             x_[i] = x[i] + dn*mernd(s_[i])[0] #                                ^^^^^^^^^^^^^
             retry += 1
             if retry > 100:
@@ -61,12 +62,13 @@ def Objective(merged):
 # The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
 # note that there is one problem with this approach, namely that the
 # step size may not adapt if the parent is not killed.
-def Search(data, max_generations=100, tau=1.0/(np.sqrt(2)), sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
+def Search(data, x = None, max_generations=100, sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
     # generate packing patterns from input data
     merged = ExtendedGlulamPatternProcessor(data)
     # generate initial unique roll widths, say lamba different configurations
     # this is by default the best solution found so far
-    x = np.random.choice(range(0, n_max, dn),size=lamba, replace=False)
+    if x is None:
+        x = np.random.choice(range(0, n_max, dn),size=lamba, replace=False)
     sigma = sigma0*np.ones(lamba)
     for roll_width in x:
         merged.add_roll_width(roll_width)
@@ -79,9 +81,18 @@ def Search(data, max_generations=100, tau=1.0/(np.sqrt(2)), sigma0=5, lamba=10, 
     STATS = [(xstar,sstar,waste,npresses,x,sigma,press,merged,0)]
     for gen in range(1,max_generations): 
         lamba = len(xstar) # each parent generates one child (could be more in theory)
-        x_, s_ = Mutate(xstar, sstar, tau, nmin, n_max, dn)
+        tau_ = 1/np.sqrt(2*len(xstar))
+        tau = 1/np.sqrt(2*np.sqrt(len(xstar)))
+        x_, s_ = Mutate(xstar, sstar, tau, tau_, nmin, n_max, dn)
         # here we need to check if x_ is zero and if to se should reset this parameter
+        iremove = []
         for i in range(len(x_)):
+            if x_[i] in xstar:
+                # find the index of the roll width in xstar
+                j = np.where(xstar == x_[i])[0][0]
+                sstar[j] = s_[i] # facilitate self-adaptation
+                # remove entry i from x_ and s_
+                iremove.append(i)
             if x_[i] == 0:
                 s_[i] = sigma
                 while x_[i] == 0 or x_[i] < nmin or x_[i] > n_max or x_[i] in x_[:i] or x_[i] in x:
@@ -90,6 +101,9 @@ def Search(data, max_generations=100, tau=1.0/(np.sqrt(2)), sigma0=5, lamba=10, 
         for i in range(len(x)):
             if x[i] not in xstar:
                 merged.remove_roll_width(x[i])
+        # remove i entries stored in iremove from x_ and s_
+        x_ = np.delete(x_, iremove)
+        s_ = np.delete(s_, iremove)
         # add the new roll widths to the press
         x = np.concatenate((xstar, x_))
         sigma = np.concatenate((sstar, s_))
@@ -113,7 +127,7 @@ def Search(data, max_generations=100, tau=1.0/(np.sqrt(2)), sigma0=5, lamba=10, 
         STATS.append((xstar,sstar,waste,npresses,x,sigma,press,merged,gen))
 
     return xstar, sstar, STATS         
-def main(file_path, depth):
+def main(file_path, depth, name):
     logger = setup_logger('IDeLM-Glulam')
     logger.info("Starting the Glulam Production Optimizer")
 
@@ -124,11 +138,12 @@ def main(file_path, depth):
 
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
-    xstar, sstar, STATS = Search(data, max_generations = 100)
-    with open('best_solution.pkl', 'wb') as f:
+    wr = np.array([22800, 23000, 23500, 23600, 23700, 24900])
+    xstar, sstar, STATS = Search(data, x = None, max_generations = 300)
+    with open('soln_' + name + '_' + str(depth) + '.pkl', 'wb') as f:
         pickle.dump((xstar, sstar, STATS), f)
     
-    with open('best_solution.pkl', 'rb') as f:
+    with open('soln_' + name + '_' + str(depth) + '.pkl', 'rb') as f:
         (xstar, sstar, STATS) = pickle.load(f)
 
 if __name__ == "__main__":
@@ -141,6 +156,10 @@ if __name__ == "__main__":
         "--depth", type=int, default=GlulamConfig.DEFAULT_DEPTH,
         help="Depth to consider in mm (default: %(default)s)"
     )
+    parser.add_argument(
+        "--name", type=str, default="run",
+        help="name of experiment (default: %(default)s)"
+    )
     args = parser.parse_args()
 
-    main(args.file, args.depth)
+    main(args.file, args.depth, args.name)
