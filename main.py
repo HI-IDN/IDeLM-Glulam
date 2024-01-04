@@ -62,7 +62,7 @@ def Objective(merged):
 # The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
 # note that there is one problem with this approach, namely that the
 # step size may not adapt if the parent is not killed.
-def Search(data, x = None, max_generations=100, sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
+def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
     # generate packing patterns from input data
     merged = ExtendedGlulamPatternProcessor(data)
     # generate initial unique roll widths, say lamba different configurations
@@ -90,7 +90,7 @@ def Search(data, x = None, max_generations=100, sigma0=5, lamba=10, n_max=Glulam
             if x_[i] in xstar:
                 # find the index of the roll width in xstar
                 j = np.where(xstar == x_[i])[0][0]
-                sstar[j] = s_[i] # facilitate self-adaptation
+                sstar[j] = sstar[j] + alpha*(s_[i] - sstar[j]) # facilitate self-adaptation
                 # remove entry i from x_ and s_
                 iremove.append(i)
             if x_[i] == 0:
