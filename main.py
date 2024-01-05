@@ -81,6 +81,7 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
     # now lets start the search, for max max_generations
     STATS = [(xstar,sstar,waste,npresses,x,sigma,press,merged,0)]
     for gen in range(1,max_generations): 
+        print("Generation: ", gen, "/", max_generations)
         lamba = len(xstar) # each parent generates one child (could be more in theory)
         tau_ = 1/np.sqrt(2*len(xstar))
         tau = 1/np.sqrt(2*np.sqrt(len(xstar)))
@@ -123,7 +124,6 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
             if (waste_ <= waste and npresses_ <= npresses) or (npresses_ < npresses):
                 xstar, sstar, sucstar = Selection(x, sigma, success, press)
                 waste, npresses = waste_, npresses_
-                print("Generation", gen)
                 print("new best solution found with waste =", waste, "and npresses =", npresses)
                 print("the roll widths are", xstar)
                 print("the step sizes are", sstar)

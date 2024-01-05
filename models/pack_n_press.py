@@ -4,6 +4,22 @@ import gurobipy as gp
 import numpy as np
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
+import time
+
+def cb(model, where):
+    if where == GRB.Callback.MIPNODE:
+        # Get model objective
+        obj = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+
+        # Has objective changed?
+        if abs(obj - model._cur_obj) > 1e-8:
+            # If so, update incumbent and time
+            model._cur_obj = obj
+            model._time = time.time()
+
+    # Terminate if objective has not improved in 60s
+    if time.time() - model._time > 60:
+        model.terminate()
 
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
@@ -234,8 +250,12 @@ class GlulamPackagingProcessor:
             gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)
             , gp.GRB.MINIMIZE)
 
+        # Last updated objective and time
+        pmodel._cur_obj = float('inf')
+        pmodel._time = time.time()
+
         # solve the model
-        pmodel.optimize()
+        pmodel.optimize(callback=cb)
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
