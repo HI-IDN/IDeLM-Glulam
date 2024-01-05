@@ -89,7 +89,7 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
         for i in range(len(xstar)):
             if sucstar[i] > 5:
                 sstar[i] = sstar[i]*0.8
-                sucstar[i] = 0        
+                sucstar[i] = 1        
         x_, s_ = Mutate(xstar, sstar, tau, tau_, nmin, n_max, dn)
         # here we need to check if x_ is zero and if to se should reset this parameter
         iremove = []
@@ -114,7 +114,8 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
         # concatenate the parents and children
         x = np.concatenate((xstar, x_))
         sigma = np.concatenate((sstar, s_))
-        success = np.concatenate((sucstar+1, np.ones(len(x_)))) # increment success parameter for parents
+        sucstar = sucstar + 1
+        success = np.concatenate((sucstar, np.ones(len(x_)))) # increment success parameter for parents
         for i in range(len(x)):
             if x[i] not in xstar:
                 merged.add_roll_width(x[i])
@@ -127,12 +128,12 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
                 print("new best solution found with waste =", waste, "and npresses =", npresses)
                 print("the roll widths are", xstar)
                 print("the step sizes are", sstar)
-                print("the sucesses are", sucstar)
+                print("the successes are", sucstar)
                 print("the number of roll widths is", len(xstar))
                 print("the number of patterns is", merged.n)
                 print("the number of presses is", npresses)
                 print("the total waste is", waste)
-        STATS.append((xstar,sstar,waste,npresses,x,sigma,press,merged,gen))
+        STATS.append((xstar,sstar,sucstar,waste,npresses,x,sigma,press,merged,gen))
 
     return xstar, sstar, STATS         
 def main(file_path, depth, name):
