@@ -37,13 +37,13 @@ def Mutate(x, s, tau, tau_, nmin, nmax, dn):
                 break # note that this will return x_[i] as 0 !!!
     return x_, s_
 
-def Selection(x, s, press):
+def Selection(x, s, success, press):
     # extract the roll widths used in the press
     I = range(len(x))
     rw_used = np.array([x[i] for i in I if x[i] in press.RW_used])
     sa_used = np.array([s[i] for i in I if x[i] in press.RW_used])
-
-    return rw_used, sa_used
+    success_used = np.array([success[i] for i in I if x[i] in press.RW_used])
+    return rw_used, sa_used, success_used
 
 # The objective function assumes the MIN_PRESSES is to small to fit all orders
 # if the number of presses are too few or the patterns just do not fit then the
@@ -70,27 +70,33 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
     if x is None:
         x = np.random.choice(range(0, n_max, dn),size=lamba, replace=False)
     sigma = sigma0*np.ones(lamba)
+    success = np.ones(lamba)
     for roll_width in x:
         merged.add_roll_width(roll_width)
     (waste, npresses), press = Objective(merged)
     if waste is None:
         print("The ES intialization failed to find a feasible solution, retry?")
         return None
-    xstar, sstar = Selection(x, sigma, press)
+    xstar, sstar, sucstar = Selection(x, sigma, press)
     # now lets start the search, for max max_generations
     STATS = [(xstar,sstar,waste,npresses,x,sigma,press,merged,0)]
     for gen in range(1,max_generations): 
         lamba = len(xstar) # each parent generates one child (could be more in theory)
         tau_ = 1/np.sqrt(2*len(xstar))
         tau = 1/np.sqrt(2*np.sqrt(len(xstar)))
+        # use the one-fith rule to adapt the step size
+        for i in range(len(xstar)):
+            if sucstar[i] > 5:
+                sstar[i] = sstar[i]*0.8
+                sucstar[i] = 0        
         x_, s_ = Mutate(xstar, sstar, tau, tau_, nmin, n_max, dn)
         # here we need to check if x_ is zero and if to se should reset this parameter
         iremove = []
         for i in range(len(x_)):
             if x_[i] in xstar:
                 # find the index of the roll width in xstar
-                j = np.where(xstar == x_[i])[0][0]
-                sstar[j] = sstar[j] + alpha*(s_[i] - sstar[j]) # facilitate self-adaptation
+                #j = np.where(xstar == x_[i])[0][0]
+                #sstar[j] = sstar[j] + alpha*(s_[i] - sstar[j]) # facilitate self-adaptation
                 # remove entry i from x_ and s_
                 iremove.append(i)
             if x_[i] == 0:
@@ -104,9 +110,10 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
         # remove i entries stored in iremove from x_ and s_
         x_ = np.delete(x_, iremove)
         s_ = np.delete(s_, iremove)
-        # add the new roll widths to the press
+        # concatenate the parents and children
         x = np.concatenate((xstar, x_))
         sigma = np.concatenate((sstar, s_))
+        success = np.concatenate((sucstar+1, np.ones(len(x_)))) # increment success parameter for parents
         for i in range(len(x)):
             if x[i] not in xstar:
                 merged.add_roll_width(x[i])
@@ -114,12 +121,13 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
         (waste_, npresses_), press = Objective(merged)
         if waste_ is not None:
             if (waste_ <= waste and npresses_ <= npresses) or (npresses_ < npresses):
-                xstar, sstar = Selection(x, sigma, press)
+                xstar, sstar, sucstar = Selection(x, sigma, success, press)
                 waste, npresses = waste_, npresses_
                 print("Generation", gen)
                 print("new best solution found with waste =", waste, "and npresses =", npresses)
                 print("the roll widths are", xstar)
                 print("the step sizes are", sstar)
+                print("the sucesses are", sucstar)
                 print("the number of roll widths is", len(xstar))
                 print("the number of patterns is", merged.n)
                 print("the number of presses is", npresses)
