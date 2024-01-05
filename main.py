@@ -77,7 +77,7 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
     if waste is None:
         print("The ES intialization failed to find a feasible solution, retry?")
         return None
-    xstar, sstar, sucstar = Selection(x, sigma, press)
+    xstar, sstar, sucstar = Selection(x, sigma, success, press)
     # now lets start the search, for max max_generations
     STATS = [(xstar,sstar,waste,npresses,x,sigma,press,merged,0)]
     for gen in range(1,max_generations): 
