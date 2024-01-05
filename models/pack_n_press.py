@@ -7,9 +7,9 @@ from utils.logger import setup_logger
 import time
 
 def cb(model, where):
-    if where == GRB.Callback.MIPNODE:
+    if where == gp.GRB.Callback.MIPNODE:
         # Get model objective
-        obj = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+        obj = model.cbGet(gp.GRB.Callback.MIPNODE_OBJBST)
 
         # Has objective changed?
         if abs(obj - model._cur_obj) > 1e-8:
