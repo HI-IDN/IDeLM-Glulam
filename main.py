@@ -149,7 +149,7 @@ def main(file_path, depth, name, run):
     # generate initial roll widths, say ten different configurations
     wr = [25000, 23600, 24500, 23800, 22600]
     wr = np.array([22800, 23000, 23500, 23600, 23700, 24900])
-    xstar, sstar, STATS = Search(data, x = None, max_generations = 2)
+    xstar, sstar, STATS = Search(data, x = None, max_generations = 100)
     with open(name + '_' + str(depth) + '/soln_' + run + '.pkl', 'wb') as f:
         pickle.dump((xstar, sstar, STATS), f)
     
