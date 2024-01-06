@@ -101,7 +101,7 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
                 #sstar[j] = sstar[j] + alpha*(s_[i] - sstar[j]) # facilitate self-adaptation
                 # remove entry i from x_ and s_
                 iremove.append(i)
-            if x_[i] == 0:
+            if x_[i] == 0: # reset the variable using initialization procedure
                 s_[i] = sigma
                 while x_[i] == 0 or x_[i] < nmin or x_[i] > n_max or x_[i] in x_[:i] or x_[i] in x:
                     x_[i] = np.random.choice(range(0, n_max, dn), size = 1, replace = False)
@@ -137,7 +137,7 @@ def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10,
         STATS.append((xstar,sstar,sucstar,waste,npresses,x,sigma,press,merged,gen))
 
     return xstar, sstar, STATS         
-def main(file_path, depth, name):
+def main(file_path, depth, name, run):
     logger = setup_logger('IDeLM-Glulam')
     logger.info("Starting the Glulam Production Optimizer")
 
@@ -153,7 +153,7 @@ def main(file_path, depth, name):
     with open('soln_' + name + '_' + str(depth) + '.pkl', 'wb') as f:
         pickle.dump((xstar, sstar, STATS), f)
     
-    with open('soln_' + name + '_' + str(depth) + '.pkl', 'rb') as f:
+    with open(name + '_' + str(depth) + '/soln_' + run + '.pkl', 'rb') as f:
         (xstar, sstar, STATS) = pickle.load(f)
 
 if __name__ == "__main__":
@@ -167,8 +167,12 @@ if __name__ == "__main__":
         help="Depth to consider in mm (default: %(default)s)"
     )
     parser.add_argument(
-        "--name", type=str, default="run",
+        "--name", type=str, default="tmp",
         help="name of experiment (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--run", type=str, default="0",
+        help="name number of experiment (default: %(default)s)"
     )
     args = parser.parse_args()
 
