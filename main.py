@@ -176,4 +176,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.file, args.depth, args.name)
+    main(args.file, args.depth, args.name, args.run)
