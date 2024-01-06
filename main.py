@@ -63,7 +63,7 @@ def Objective(merged):
 # The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
 # note that there is one problem with this approach, namely that the
 # step size may not adapt if the parent is not killed.
-def Search(data, x = None, max_generations=100, alpha = 0.1, sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
+def Search(data, x = None, max_generations = 100, alpha = 0.1, sigma0=5, lamba=10, n_max=GlulamConfig.MAX_ROLL_WIDTH-GlulamConfig.ROLL_WIDTH_TOLERANCE, dn=GlulamConfig.ROLL_WIDTH_TOLERANCE, nmin=0):
     # generate packing patterns from input data
     merged = ExtendedGlulamPatternProcessor(data)
     # generate initial unique roll widths, say lamba different configurations
@@ -150,10 +150,10 @@ def main(file_path, depth, name, run):
     wr = [25000, 23600, 24500, 23800, 22600]
     wr = np.array([22800, 23000, 23500, 23600, 23700, 24900])
     xstar, sstar, STATS = Search(data, x = None, max_generations = 100)
-    with open(name + '_' + str(depth) + '/soln_' + run + '.pkl', 'wb') as f:
+    with open(name + '_' + str(depth) + '/soln_' + str(run) + '.pkl', 'wb') as f:
         pickle.dump((xstar, sstar, STATS), f)
     
-    with open(name + '_' + str(depth) + '/soln_' + run + '.pkl', 'rb') as f:
+    with open(name + '_' + str(depth) + '/soln_' + str(run) + '.pkl', 'rb') as f:
         (xstar, sstar, STATS) = pickle.load(f)
 
 if __name__ == "__main__":
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         help="name of experiment (default: %(default)s)"
     )
     parser.add_argument(
-        "--run", type=str, default="0",
+        "--run", type=int, default=0,
         help="name number of experiment (default: %(default)s)"
     )
     args = parser.parse_args()
