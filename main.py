@@ -29,11 +29,12 @@ def Mutate(x, s, tau, tau_, nmin, nmax, dn):
     for i in range(len(x)):
         s_[i] = s[i]*np.exp(eta1+tau*np.random.randn())
         retry = 0
-        while x_[i] == 0 or x_[i] < nmin or x_[i] > nmax or x_[i] in x_[:i]: # or x_[i] in x:
+        while x_[i] == 0 or x_[i] < nmin or x_[i] > nmax or x_[i] in x_[:i] or x_[i] in x:
             x_[i] = x[i] + dn*mernd(s_[i])[0] #                                ^^^^^^^^^^^^^
             retry += 1
             if retry > 100:
                 print("mutation failed for :", x[i], s_[i])
+                x_[i] = 0
                 break # note that this will return x_[i] as 0 !!!
     return x_, s_
 
