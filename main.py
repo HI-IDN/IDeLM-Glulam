@@ -102,7 +102,7 @@ def Search(data, x = None, max_generations = 100, alpha = 0.1, sigma0=5, lamba=1
                 # remove entry i from x_ and s_
                 iremove.append(i)
             if x_[i] == 0: # reset the variable using initialization procedure
-                s_[i] = sigma
+                s_[i] = sigma0
                 while x_[i] == 0 or x_[i] < nmin or x_[i] > n_max or x_[i] in x_[:i] or x_[i] in x:
                     x_[i] = np.random.choice(range(0, n_max, dn), size = 1, replace = False)
         # remove roll widths that are not used in the press
