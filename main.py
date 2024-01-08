@@ -52,7 +52,7 @@ def Selection(x, s, success, press):
 def Objective(merged):
     press = GlulamPackagingProcessor(merged, GlulamConfig.MIN_PRESSES)
     objective = (None, None)
-    while not press.solved and press.number_of_presses < GlulamConfig.MAX_PRESSES:
+    while not press.solved: # and press.number_of_presses < GlulamConfig.MAX_PRESSES:
         press.update_number_of_presses(press.number_of_presses + 1)
         press.pack_n_press()
         if press.solved:
