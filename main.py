@@ -77,6 +77,7 @@ def Search(data, x = None, max_generations = 100, alpha = 0.1, sigma0=5, lamba=1
     (waste, npresses), press = Objective(merged)
     if waste is None:
         print("The ES intialization failed to find a feasible solution, retry?")
+        print("Try increasing maximum number of presses", GlulamConfig.MAX_PRESSES)
         return None
     xstar, sstar, sucstar = Selection(x, sigma, success, press)
     # now lets start the search, for max max_generations
