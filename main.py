@@ -77,7 +77,13 @@ def Search(data, x = None, max_generations = 100, alpha = 0.1, sigma0=5, lamba=1
     (waste, npresses), press = Objective(merged)
     if waste is None:
         print("The ES intialization failed to find a feasible solution, retry?")
-        print("Try increasing maximum number of presses", GlulamConfig.MAX_PRESSES)
+        # compute the minimum number of presses needed to fit all orders
+        area_needed = 0
+        for i in len(data.orders):
+            area_needed += data.quantity[i]*data.height[i]*data.width[i]
+        npresses = np.ceil(area_needed/(GlulamConfig.MAX_ROLL_WIDTH*GlulamConfig.MAX_HEIGHT_LAYERS*45.0))
+        print("Try increasing maximum number of presses", GlulamConfig.MAX_PRESSES, "to more than", npresses)
+
         return None
     xstar, sstar, sucstar = Selection(x, sigma, success, press)
     # now lets start the search, for max max_generations
