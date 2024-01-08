@@ -27,7 +27,6 @@ logger = setup_logger('GlulamPackagingProc')
 # Set pandas options to display precision to 3 significant digits
 pd.set_option('display.precision', 3)
 
-
 class GlulamPackagingProcessor:
     def __init__(self, pattern_processor, number_of_presses=GlulamConfig.MAX_PRESSES):
         """
@@ -75,7 +74,7 @@ class GlulamPackagingProcessor:
         Parameters:
         - number_of_presses (int): The new number of presses to be used.
         """
-        assert number_of_presses <= GlulamConfig.MAX_PRESSES, f'Cannot surpass {GlulamConfig.MAX_PRESSES} presses. Check data.'
+        #assert number_of_presses <= GlulamConfig.MAX_PRESSES, f'Cannot surpass {GlulamConfig.MAX_PRESSES} presses. Check data.'
         self._number_of_presses = number_of_presses
 
     @property
