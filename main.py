@@ -79,7 +79,7 @@ def Search(data, x = None, max_generations = 100, alpha = 0.1, sigma0=5, lamba=1
         print("The ES intialization failed to find a feasible solution, retry?")
         # compute the minimum number of presses needed to fit all orders
         area_needed = 0
-        for i in len(data.orders):
+        for i in range(len(data.orders)):
             area_needed += data.quantity[i]*data.height[i]*data.width[i]
         npresses = np.ceil(area_needed/(GlulamConfig.MAX_ROLL_WIDTH*GlulamConfig.MAX_HEIGHT_LAYERS*45.0))
         print("Try increasing maximum number of presses", GlulamConfig.MAX_PRESSES, "to more than", npresses)
