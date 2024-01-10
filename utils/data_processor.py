@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from config.settings import GlulamConfig
+import logging
 
 
 class GlulamDataProcessor:
@@ -15,11 +16,13 @@ class GlulamDataProcessor:
         # Filter and update the filtered data
         self._filtered_data = raw_data[raw_data['depth'] == depth]
 
-        # Adjust any beams with too many layers, make sure they are within the limit
-        self._filtered_data.loc[
-            self._filtered_data['layers'] > GlulamConfig.MAX_HEIGHT_LAYERS, 'layers'] = GlulamConfig.MAX_HEIGHT_LAYERS
-
-        print(self._filtered_data)
+        # Check if there are any beams with height greater than the maximum allowed height
+        # Warn the user and set the height to the maximum allowed height
+        too_tall = self._filtered_data['layers'] > GlulamConfig.MAX_HEIGHT_LAYERS
+        if too_tall.any():
+            logging.warning(f"The following beams are too tall and will be truncated to "
+                            f"{GlulamConfig.MAX_HEIGHT_LAYERS} layers:\n{self._filtered_data[too_tall]}")
+            self._filtered_data.loc[too_tall, 'layers'] = GlulamConfig.MAX_HEIGHT_LAYERS
 
         # Reset index
         self._filtered_data.reset_index(drop=True, inplace=True)
