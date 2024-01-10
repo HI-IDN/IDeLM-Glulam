@@ -28,6 +28,11 @@ class GlulamDataProcessor:
         self._filtered_data.reset_index(drop=True, inplace=True)
 
     @property
+    def area(self):
+        """ Compute the minimum area needed to fit all orders in square meters. """
+        return np.sum(self.quantity * self.heights * self.widths) / 1e6
+
+    @property
     def depth(self):
         return np.array(self._filtered_data['depth'].tolist(), dtype=int)
 
