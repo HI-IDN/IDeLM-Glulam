@@ -15,6 +15,12 @@ class GlulamDataProcessor:
         # Filter and update the filtered data
         self._filtered_data = raw_data[raw_data['depth'] == depth]
 
+        # Adjust any beams with too many layers, make sure they are within the limit
+        self._filtered_data.loc[
+            self._filtered_data['layers'] > GlulamConfig.MAX_HEIGHT_LAYERS, 'layers'] = GlulamConfig.MAX_HEIGHT_LAYERS
+
+        print(self._filtered_data)
+
         # Reset index
         self._filtered_data.reset_index(drop=True, inplace=True)
 
