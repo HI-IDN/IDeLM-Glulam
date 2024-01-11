@@ -21,3 +21,4 @@ class GlulamConfig:
     GUROBI_TIME_LIMIT = 4 * 60  # in seconds, 2 minutes
     GUROBI_OUTPUT_FLAG = 0  # 0: silent, 1: summary, 2: detailed, 3: verbose
     VERBOSE_LOGGING = False
+    ES_MAX_GENERATIONS = 100
