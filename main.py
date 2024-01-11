@@ -13,11 +13,6 @@ def main(file_path, depth, name, run, mode, overwrite):
     logger = setup_logger('IDeLM-Glulam')
     logger.info("Starting the Glulam Production Optimizer")
 
-    # Load and process data
-    data = GlulamDataProcessor(file_path, depth)
-    logger.info(f"Data loaded for depth: {depth}")
-    logger.info(f"Number of items: {data.m}")
-
     # File to save the solution
     if run is None:
         filename = f'data/{name}/soln_{mode}_d{depth}.pkl'
@@ -31,6 +26,11 @@ def main(file_path, depth, name, run, mode, overwrite):
         return
     else:
         logger.info(f"Running {mode} mode. Results will be saved in {filename}.")
+
+    # Load and process data
+    data = GlulamDataProcessor(file_path, depth)
+    logger.info(f"Data loaded for depth: {depth}")
+    logger.info(f"Number of items: {data.m}")
 
     if mode == "ES":
         # Evolutionary Search mode
