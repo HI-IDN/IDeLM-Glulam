@@ -1,4 +1,4 @@
-.PHONY: all runs
+.PHONY: all single es
 
 # Define the number of runs
 NUM_RUNS := 10
@@ -10,16 +10,22 @@ RUNS := $(shell seq 0 $(shell expr $(NUM_RUNS) - 1))
 VERSION := $(shell git describe --tags --always --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
 
 # Define depths
-DEPTHS := 90 115 140 160
+DEPTHS := 90 115 140 160 185
 
-# Main target
-all: $(DEPTHS)
+# Main target for ES mode
+all: es
 
-# Define a rule for each depth that depends on its runs
-$(DEPTHS):
-	@$(MAKE) --no-print-directory DEPTH=$@ runs
+# Define a rule for each depth that depends on its runs for ES mode
+es:
+	@$(foreach depth,$(DEPTHS), make $(addprefix es_, $(depth)) depth=$(depth);)
 
-# Rule for each run
-runs:
-	@$(foreach run,$(RUNS),python3 main.py --depth $(DEPTH) --name $(VERSION) --run $(run);)
+# Define a rule for each run for ES mode
+$(addprefix es_, $(DEPTHS)):
+	@$(foreach run,$(RUNS), \
+		make data/$(VERSION)/soln_ES_d$(depth)_$(run).log depth=$(depth) run=$(run);)
 
+data/$(VERSION)/soln_ES_d$(depth)_$(run).log:
+	@echo "Running ES for depth $(depth) run $(run)"
+	@mkdir -p data/$(VERSION)
+	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) > $@.running
+	mv $@.running $@
