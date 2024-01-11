@@ -1,6 +1,6 @@
 # main.py
 import argparse
-import json
+import pickle
 
 from utils.data_processor import GlulamDataProcessor
 from strategies.evolution_strategy import Search
@@ -20,9 +20,9 @@ def main(file_path, depth, name, run, mode, overwrite):
 
     # File to save the solution
     if run is None:
-        filename = f'data/{name}/soln_{mode}_d{depth}.json'
+        filename = f'data/{name}/soln_{mode}_d{depth}.pkl'
     else:
-        filename = f'data/{name}/soln_{mode}_d{depth}_{run}.json'  # Save the solution to a json file
+        filename = f'data/{name}/soln_{mode}_d{depth}_{run}.pkl'  # Save the solution to a json file
     os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create the directory if it does not exist
 
     # Check if file exists and overwrite flag is not set
@@ -44,9 +44,9 @@ def main(file_path, depth, name, run, mode, overwrite):
         logger.error(f"Unknown mode: {mode}")
         return
 
-    # Save the solution to a json file
+    # Save the solution
     with open(filename, 'wb') as f:
-        json.dump(results, f)
+        pickle.dump(results, f)
     logger.info(f"Saved the solution to {filename}")
 
 
