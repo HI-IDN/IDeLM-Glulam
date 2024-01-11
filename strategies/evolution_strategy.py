@@ -144,4 +144,4 @@ def Search(data, x=None, max_generations=100, alpha=0.1, sigma0=5, lamba=10,
                 print("the total waste is", waste)
         STATS.append((xstar, sstar, sucstar, waste, npresses, x, sigma, press, merged, gen))
 
-    return xstar, sstar, STATS
+    return {'xstar': xstar, 'sstar': sstar, 'stats': STATS}

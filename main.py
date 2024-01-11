@@ -34,19 +34,20 @@ def main(file_path, depth, name, run, mode, overwrite):
 
     if mode == "ES":
         # Evolutionary Search mode
-        xstar, sstar, STATS = Search(data, x=None, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
+        results = Search(data, x=None, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
 
     elif mode == "single":
         wr = [22800, 23000, 23500, 23600, 23700, 24900]
         logger.info(f"Running a single run mode with width: {wr} roll widths")
-        xstar, sstar, STATS = Search(data, x=wr, max_generations=1)
+        results = Search(data, x=wr, max_generations=1)
     else:
         logger.error(f"Unknown mode: {mode}")
         return
 
     # Save the solution to a json file
     with open(filename, 'wb') as f:
-        json.dump((xstar, sstar, STATS), f)
+        json.dump(results, f)
+    logger.info(f"Saved the solution to {filename}")
 
 
 if __name__ == "__main__":
