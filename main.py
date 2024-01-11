@@ -1,16 +1,15 @@
 # main.py
 import argparse
+import json
+
 from utils.data_processor import GlulamDataProcessor
-from models.cutting_pattern import ExtendedGlulamPatternProcessor
 from strategies.evolution_strategy import Search
-from models.pack_n_press import GlulamPackagingProcessor
 from config.settings import GlulamConfig
-import numpy as np
 from utils.logger import setup_logger
-import pickle
+import os
 
 
-def main(file_path, depth, name, run):
+def main(file_path, depth, name, run, mode, overwrite):
     logger = setup_logger('IDeLM-Glulam')
     logger.info("Starting the Glulam Production Optimizer")
 
@@ -19,17 +18,35 @@ def main(file_path, depth, name, run):
     logger.info(f"Data loaded for depth: {depth}")
     logger.info(f"Number of items: {data.m}")
 
-    # generate initial roll widths, say ten different configurations
-    wr = [25000, 23600, 24500, 23800, 22600]
-    wr = np.array([22800, 23000, 23500, 23600, 23700, 24900])
-    xstar, sstar, STATS = Search(data, x=None, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
+    # File to save the solution
+    if run is None:
+        filename = f'data/{name}/soln_{mode}_d{depth}.json'
+    else:
+        filename = f'data/{name}/soln_{mode}_d{depth}_{run}.json'  # Save the solution to a json file
+    os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create the directory if it does not exist
 
-    filename = name + '_' + str(depth) + '/soln_' + str(run) + '.pkl'
+    # Check if file exists and overwrite flag is not set
+    if not overwrite and os.path.exists(filename):
+        logger.info(f"File {filename} already exists. Use --overwrite to overwrite.")
+        return
+    else:
+        logger.info(f"Running {mode} mode. Results will be saved in {filename}.")
+
+    if mode == "ES":
+        # Evolutionary Search mode
+        xstar, sstar, STATS = Search(data, x=None, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
+
+    elif mode == "single":
+        wr = [22800, 23000, 23500, 23600, 23700, 24900]
+        logger.info(f"Running a single run mode with width: {wr} roll widths")
+        xstar, sstar, STATS = Search(data, x=wr, max_generations=1)
+    else:
+        logger.error(f"Unknown mode: {mode}")
+        return
+
+    # Save the solution to a json file
     with open(filename, 'wb') as f:
-        pickle.dump((xstar, sstar, STATS), f)
-
-    with open(filename, 'rb') as f:
-        (xstar, sstar, STATS) = pickle.load(f)
+        json.dump((xstar, sstar, STATS), f)
 
 
 if __name__ == "__main__":
@@ -47,9 +64,18 @@ if __name__ == "__main__":
         help="name of experiment (default: %(default)s)"
     )
     parser.add_argument(
-        "--run", type=int, default=0,
+        "--run", type=int, default=None,
         help="name number of experiment (default: %(default)s)"
     )
+    parser.add_argument(
+        "--mode", type=str, default="ES", choices=["ES", "single"],
+        help="Mode of operation (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", default=False,
+        help="Overwrite existing files (default: %(default)s)"
+    )
+
     args = parser.parse_args()
 
-    main(args.file, args.depth, args.name, args.run)
+    main(args.file, args.depth, args.name, args.run, args.mode, args.overwrite)
