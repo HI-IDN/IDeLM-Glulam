@@ -1,9 +1,9 @@
 # main.py
 import argparse
-import pickle
+import json
 
 from utils.data_processor import GlulamDataProcessor
-from strategies.evolution_strategy import Search
+from strategies.evolution_strategy import EvolutionStrategy
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import os
@@ -15,9 +15,9 @@ def main(file_path, depth, name, run, mode, overwrite):
 
     # File to save the solution
     if run is None:
-        filename = f'data/{name}/soln_{mode}_d{depth}.pkl'
+        filename = f'data/{name}/soln_{mode}_d{depth}.json'
     else:
-        filename = f'data/{name}/soln_{mode}_d{depth}_{run}.pkl'  # Save the solution to a json file
+        filename = f'data/{name}/soln_{mode}_d{depth}_{run}.json'  # Save the solution to a json file
     os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create the directory if it does not exist
 
     # Check if file exists and overwrite flag is not set
@@ -34,19 +34,21 @@ def main(file_path, depth, name, run, mode, overwrite):
 
     if mode == "ES":
         # Evolutionary Search mode
-        results = Search(data, x=None, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
+        evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
+        results = evolution_strategy.Search()
 
     elif mode == "single":
         wr = [22800, 23000, 23500, 23600, 23700, 24900]
         logger.info(f"Running a single run mode with width: {wr} roll widths")
-        results = Search(data, x=wr, max_generations=1)
+        evolution_strategy = EvolutionStrategy(data, max_generations=1)
+        results = evolution_strategy.Search(x=wr)
     else:
         logger.error(f"Unknown mode: {mode}")
         return
 
     # Save the solution
-    with open(filename, 'wb') as f:
-        pickle.dump(results, f)
+    with open(filename, 'w') as f:
+        json.dump(results, f, indent=4)
     logger.info(f"Saved the solution to {filename}")
 
 

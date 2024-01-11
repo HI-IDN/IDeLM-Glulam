@@ -376,7 +376,7 @@ class GlulamPackagingProcessor:
             columns=['Order', 'D', 'W', 'H', 'h', 'b', 'Ax', 'Ax-b'] + [f'P{k}' for k in self.K])
 
         df['Order'] = self.patterns.data.order
-        df['D'] = self.patterns.data.depth
+        df['D'] = self.patterns.data.depths
         df['W'] = self.patterns.data.widths
         df['H'] = self.patterns.data.heights
         df['h'] = self.patterns.data.layers
@@ -429,7 +429,7 @@ class GlulamPackagingProcessor:
         """ Table pertaining to set K (of all presses). """
         logger.info(f'Press information: ({self.number_of_presses} number of presses)')
         df = pd.DataFrame(
-            columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
+             columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
         df['Press'] = [k for k in self.K for r in self.R]
         df['Region'] = [r for k in self.K for r in self.R]
         df['Lp'] = [self.Lp_estimated[k, r] for k in self.K for r in self.R]

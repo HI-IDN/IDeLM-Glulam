@@ -15,6 +15,7 @@ class GlulamDataProcessor:
 
         # Filter and update the filtered data
         self._filtered_data = raw_data[raw_data['depth'] == depth]
+        self.depth = depth
 
         # Check if there are any beams with height greater than the maximum allowed height
         # Warn the user and set the height to the maximum allowed height
@@ -33,7 +34,7 @@ class GlulamDataProcessor:
         return np.sum(self.quantity * self.heights * self.widths) / 1e6
 
     @property
-    def depth(self):
+    def depths(self):
         return np.array(self._filtered_data['depth'].tolist(), dtype=int)
 
     @property
@@ -66,3 +67,18 @@ class GlulamDataProcessor:
     def orders(self):
         """ Set of orders. """
         return sorted(list(set(self.order.tolist())))
+
+
+def convert_numpy_to_json(items):
+    """ Convert numpy types to json compatible types. """
+    if isinstance(items, np.ndarray):
+        return convert_numpy_to_json(items.tolist())
+    if isinstance(items, np.int64):
+        return int(items)
+    if isinstance(items, list):
+        return [convert_numpy_to_json(x) for x in items]
+    if isinstance(items, dict):
+        return {k: convert_numpy_to_json(v) for k, v in items.items()}
+    if isinstance(items, int) or isinstance(items, float) or isinstance(items, str):
+        return items
+
