@@ -213,6 +213,11 @@ class GlulamPackagingProcessor:
             (h[k, 0] >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in self.K[:-1]), name="min_height_R0")
 
+        # now we must fulfill the demand for each item exactly
+        pmodel.addConstrs(
+            (gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
+             == self.b[i] for i in self.I), name="demand_equal_supply")
+
         # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
         # and R1 is at least the minimum height for R1.
         pmodel.addConstrs(
@@ -227,10 +232,6 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
                           name="if_press_is_not_used_then_x_is_zero")
 
-        # now we must fulfill the demand for each item exactly
-        pmodel.addConstrs(
-            (gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
-             == self.b[i] for i in self.I), name="demand_equal_supply")
 
         # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
         # h1[k] will indicate that the height of region 0 is less than 24 layers
@@ -240,11 +241,15 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs(
             (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
              for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
-        pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
 
         # make sure that all pattern length in region 1 are smaller than those in region 0
-        # make sure that the length of region 0 is longer than region 1
         pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
+
+        # make sure that the length of the region is at least the length of the longest pattern in useq
+        pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
+
+        # define the surplus of each pattern in each press and region as the difference between the length of the
+        # pattern and the length of the region
         pmodel.addConstrs(
             ((Lp[k, r] - self.L[j]) * self.H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM
              for j in self.J for k in self.K for r in self.R), name="F_surplus_definition")
