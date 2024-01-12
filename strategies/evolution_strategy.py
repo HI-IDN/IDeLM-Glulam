@@ -45,10 +45,6 @@ class EvolutionStrategy:
         self.merged = ExtendedGlulamPatternProcessor(data)
         """ The merged pattern processor. """
 
-        area_press = GlulamConfig.MAX_ROLL_WIDTH * GlulamConfig.MAX_HEIGHT_LAYERS * GlulamConfig.LAYER_HEIGHT / 1e6
-        self.min_presses = np.ceil(self.merged.data.area / area_press).astype(int)
-        """ The minimum number of presses needed to pack all orders. """
-
         self.npresses = None
         """ The number of presses used in the best solution found so far. """
 
@@ -151,10 +147,13 @@ class EvolutionStrategy:
             press (GlulamPackagingProcessor): the press object
         """
         logger.info(f"Objective - Finding the minimum number of presses needed for a feasible solution.")
-        press = GlulamPackagingProcessor(self.merged, self.min_presses - 1)
+        press = GlulamPackagingProcessor(self.merged, self.merged.min_presses - 1)
         objective = (None, None)
         while not press.solved:
             press.update_number_of_presses(press.number_of_presses + 1)
+            if press.number_of_presses > self.merged.max_presses:
+                logger.info(f"Objective - Failed to find a feasible solution with {self.merged.max_presses} presses.")
+                break
             press.pack_n_press()
             if press.solved:
                 logger.info(f"Objective - Found a feasible solution with {press.number_of_presses} presses "

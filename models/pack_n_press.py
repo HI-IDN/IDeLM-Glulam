@@ -148,8 +148,8 @@ class GlulamPackagingProcessor:
         """
 
         # Use logger within these modules
-        # logger.info(f"Starting Pack'n'Press model for {self.number_of_presses} presses.")
-        # logger.info(f'Time limit for Gurobi: {time_limit} seconds.')
+        logger.debug(f"Starting Pack'n'Press model for {self.number_of_presses} presses.")
+        logger.debug(f'Time limit for Gurobi: {time_limit} seconds.')
 
         self.solved = False
         self.RW_counts = False
@@ -275,29 +275,31 @@ class GlulamPackagingProcessor:
 
         # Extract the results
         self.solved = True
+        self.presses_in_use = (np.array([any(z[k, r].X for r in self.R) for k in self.K], dtype=bool))
+        logger.info(f'Presses in use: {np.sum(self.presses_in_use)} out of {self.number_of_presses}')
         self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
         self.xn = np.array([[[x[j, k, r].X for r in self.R] for k in self.K] for j in self.J])
         self.RW_used, self.RW_counts = np.unique(
             [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
             return_counts=True)
         row_format = " ".join(["{:>5}"] * len(self.RW_used))
-        # logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
-        # logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
+        logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
+        logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
-        # logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
+        logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
         self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=int)
-        # logger.debug(f'h:\n{self.h}')
+        logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
-        # logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
+        logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
 
         # Compute the waste
         self.Lp_actual = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
-        # logger.debug(f'Lp actual:\n{self.Lp_actual}')
+        logger.debug(f'Lp actual:\n{self.Lp_actual}')
         self.Waste = np.sum(
             self.H[:, None, None] * (self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x / 1e6,
             axis=0)  # Waste in m^2
-        # logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
-        # logger.debug(f'Waste:\n{self.Waste}')
+        logger.debug(f'Total waste: {self.TotalWaste:.3f} m^2')
+        logger.debug(f'Waste:\n{self.Waste}')
         return True
 
     def print_results(self):
@@ -429,7 +431,7 @@ class GlulamPackagingProcessor:
         """ Table pertaining to set K (of all presses). """
         logger.info(f'Press information: ({self.number_of_presses} number of presses)')
         df = pd.DataFrame(
-             columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
+            columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
         df['Press'] = [k for k in self.K for r in self.R]
         df['Region'] = [r for k in self.K for r in self.R]
         df['Lp'] = [self.Lp_estimated[k, r] for k in self.K for r in self.R]
