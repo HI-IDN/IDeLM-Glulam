@@ -1,6 +1,0 @@
-#!/bin/bash
-
-for i in {0..9}
-do
-   python3 main.py --depth 115 --name version_0 --run $i
-done

@@ -24,8 +24,8 @@ $(addprefix es_, $(DEPTHS)):
 	@$(foreach run,$(RUNS), \
 		make data/$(VERSION)/soln_ES_d$(depth)_$(run).log depth=$(depth) run=$(run);)
 
-data/$(VERSION)/soln_ES_d$(depth)_$(run).log:
+
+data/$(VERSION)/soln_ES_d$(depth)_$(run).json:
 	@echo "Running ES for depth $(depth) run $(run)"
 	@mkdir -p data/$(VERSION)
-	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) > $@.running
-	mv $@.running $@
+	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) | tee $(@:.json=.log) 2>&1
