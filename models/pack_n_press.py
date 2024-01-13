@@ -259,7 +259,8 @@ class GlulamPackagingProcessor:
         pmodel._time = time.time()
 
         # solve the model
-        pmodel.optimize(callback=cb)
+        # pmodel.optimize(callback=cb)
+        pmodel.optimize()
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
