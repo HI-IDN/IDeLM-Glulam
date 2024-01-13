@@ -165,10 +165,10 @@ class EvolutionStrategy:
 
         return objective, press
 
-    def _add_stats(self, x, sigma, gen):
+    def _add_stats(self, x, sigma, gen, current_obj):
         if self.stats is None:
             self.stats = {'xstar': [], 'sstar': [], 'sucstar': [], 'waste': [], 'npresses': [], 'x': [], 'sigma': [],
-                          'gen': []}
+                          'gen': [], 'npatterns': [], 'objective': []}
         self.stats['xstar'].append(self.xstar)
         self.stats['sstar'].append(self.sstar)
         self.stats['sucstar'].append(self.sucstar)
@@ -177,6 +177,8 @@ class EvolutionStrategy:
         self.stats['x'].append(x)
         self.stats['sigma'].append(sigma)
         self.stats['gen'].append(gen)
+        self.stats['npatterns'].append(self.merged.n)
+        self.stats['objective'].append(current_obj)
         logger.info(
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
@@ -289,7 +291,7 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the successes are {self.sucstar}")
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
 
-            self._add_stats(x, sigma, gen)
+            self._add_stats(x, sigma, gen, (waste_, npresses_))
 
             if gen % saving_interval == 0:
                 save_results(filename+".part")

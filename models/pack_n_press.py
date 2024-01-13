@@ -227,9 +227,6 @@ class GlulamPackagingProcessor:
             (gp.quicksum(h[k, r] for r in self.R) >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in self.K[:-1]),
             name="min_height_combined")
-        pmodel.addConstrs(
-            (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
-            name="if_region_1_is_used_then_region_0_is_used")
 
         # if the press is not used the x must be zero
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
@@ -240,12 +237,17 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs(
             (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
              for k in self.K[:-1]), name="h1_if_region_0_is_less_than_24_layers")
-        pmodel.addConstrs(
-            (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
-             for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
 
-        # make sure that all pattern length in region 1 are smaller than those in region 0
-        pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
+        if self._number_of_regions > 1:
+            pmodel.addConstrs(
+                (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
+                name="if_region_1_is_used_then_region_0_is_used")
+            pmodel.addConstrs(
+                (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
+                 for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
+
+            # make sure that all pattern length in region 1 are smaller than those in region 0
+            pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
 
         # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
@@ -294,7 +296,7 @@ class GlulamPackagingProcessor:
         logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
         logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
-        logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
+        logger.info(f'Objective value: {self.ObjectiveValue:.2f}')
         self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=int)
         logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
