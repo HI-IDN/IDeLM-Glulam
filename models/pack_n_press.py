@@ -245,7 +245,7 @@ class GlulamPackagingProcessor:
         # make sure that all pattern length in region 1 are smaller than those in region 0
         pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
 
-        # make sure that the length of the region is at least the length of the longest pattern in useq
+        # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
 
         # define the surplus of each pattern in each press and region as the difference between the length of the
@@ -264,7 +264,8 @@ class GlulamPackagingProcessor:
         pmodel._time = time.time()
 
         # solve the model
-        pmodel.optimize(callback=cb)
+        # pmodel.optimize(callback=cb)
+        pmodel.optimize()
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
