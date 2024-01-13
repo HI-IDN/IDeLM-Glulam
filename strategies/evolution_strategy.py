@@ -198,9 +198,8 @@ class EvolutionStrategy:
             """ Save results to json. """
             results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
                        'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
-            convert_numpy_to_json(results)
             with open(filename, 'w') as f:
-                json.dump(results, f, indent=4)
+                json.dump(convert_numpy_to_json(results), f, indent=4)
             logger.info(f"Saved the solution to {filename}")
 
         # generate initial unique roll widths, say Objective different configurations
