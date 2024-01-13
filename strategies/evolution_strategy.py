@@ -298,4 +298,5 @@ class EvolutionStrategy:
 
         # Save final results and remove intermediate results
         save_results(filename)
-        os.remove(filename+".part")
+        if os.path.exists(filename + ".part"):
+            os.remove(filename + ".part")
