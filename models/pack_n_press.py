@@ -6,29 +6,51 @@ from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import time
 
-
-def cb(model, where):
-    if where == gp.GRB.Callback.MIPNODE:
-        # Get model objective
-        obj = model.cbGet(gp.GRB.Callback.MIPNODE_OBJBST)
-
-        # Has objective changed?
-        if abs(obj - model._cur_obj) > 1e-8:
-            # If so, update incumbent and time
-            model._cur_obj = obj
-            model._time = time.time()
-
-    # Terminate if objective has not improved in 60s
-    if time.time() - model._time > 60:
-        model.terminate()
-
-
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
 
 # Set pandas options to display precision to 3 significant digits
 pd.set_option('display.precision', 3)
 
+
+def cb(model, where):
+    """
+    Gurobi callback function for logging and termination conditions.
+
+    Logs when the first feasible solution is found and logs termination due to no
+    improvement in GUROBI_NO_IMPROVEMENT_TIME_LIMIT seconds after finding at least one feasible solution.
+
+    Parameters:
+    - model (gurobipy.Model): The Gurobi model.
+    - where (int): Callback code indicating the current Gurobi state.
+    """
+    if where == gp.GRB.Callback.MIP:
+        # Check if a feasible solution is found
+        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not hasattr(model, '_feasible_time'):
+            model._feasible_time = time.time()
+            model._time = time.time()
+            logger.info(
+                f"First feasible solution found after {(model._feasible_time - model._start_time) / 60:.2f} minutes.")
+
+    if where == gp.GRB.Callback.MIPNODE:
+        # Get model objective
+        obj = model.cbGet(gp.GRB.Callback.MIPNODE_OBJBST)
+
+        # Has objective changed?
+        if abs(obj - model._cur_obj) > 1e-8:
+            # Update incumbent and time
+            model._cur_obj = obj
+            model._time = time.time()
+
+    # Terminate if a feasible solution has been found and no improvement for over a minute
+    if hasattr(model, '_feasible_time') and model._feasible_time:
+        if time.time() - model._time > GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT:
+            model._terminated_early = time.time()
+            model.terminate()
+            logger.warning(f"Terminating optimization: no improvement for over "
+                           f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT/60:.0f} minute. "
+                           f"Elapsed time since first feasible solution: "
+                           f"{(model._terminated_early - model._feasible_time) / 60:.2f} minutes.")
 
 class GlulamPackagingProcessor:
     def __init__(self, pattern_processor, number_of_presses, number_of_regions=GlulamConfig.REGIONS):
@@ -247,7 +269,8 @@ class GlulamPackagingProcessor:
                  for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
 
             # make sure that all pattern length in region 1 are smaller than those in region 0
-            pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
+            pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K),
+                              name="Lp0_greater_than_Lp1")
 
         # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
@@ -264,17 +287,15 @@ class GlulamPackagingProcessor:
             , gp.GRB.MINIMIZE)
 
         # Last updated objective and time
-        pmodel._cur_obj = float('inf')
-        pmodel._time = time.time()
+        pmodel._cur_obj = 1e100
+        pmodel._start_time = time.time()  # Initialize the start time before optimization
 
         # solve the model
         pmodel.optimize(callback=cb)
-        # pmodel.optimize()
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
             logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
-
             return False
 
         try:
@@ -296,7 +317,7 @@ class GlulamPackagingProcessor:
         logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
         logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
-        logger.info(f'Objective value: {self.ObjectiveValue:.2f}')
+        logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
         self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=int)
         logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
@@ -308,7 +329,7 @@ class GlulamPackagingProcessor:
         self.Waste = np.sum(
             self.H[:, None, None] * (self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x / 1e6,
             axis=0)  # Waste in m^2
-        logger.debug(f'Total waste: {self.TotalWaste:.3f} m^2')
+        logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
         logger.debug(f'Waste:\n{self.Waste}')
         return True
 

@@ -35,7 +35,7 @@ def main(file_path, depth, name, run, mode, overwrite, num_cpus):
     if mode == "ES":
         # Evolutionary Search mode
         evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS, num_cpus=num_cpus)
-        evolution_strategy.Search(filename, saving_interval=5)
+        evolution_strategy.Search(filename)
 
     elif mode == "single":
         wr = [22800, 23000, 23500, 23600, 23700, 24900]

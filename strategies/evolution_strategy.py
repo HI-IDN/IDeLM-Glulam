@@ -183,7 +183,7 @@ class EvolutionStrategy:
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
 
-    def Search(self, filename, saving_interval=5, x=None):
+    def Search(self, filename, x=None):
         """
         The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
         note that there is one problem with this approach, namely that the
@@ -191,7 +191,6 @@ class EvolutionStrategy:
 
         Args:
             filename (str): File name to save results
-            saving_interval (int): Interval to save intermediate results
             x (nparray): initial roll widths
         """
         logger.info(f"Initialising the Evolutionary Search")
@@ -233,7 +232,7 @@ class EvolutionStrategy:
         self.Selection(x, sigma, success, press)
 
         # now lets start the search, for max max_generations
-        self._add_stats(x, sigma, 0)
+        self._add_stats(x, sigma, 0,(self.waste, self.npresses))
         for gen in range(1, self.max_generations):
             logger.info(f"Generation: {gen}/{self.max_generations}")
 
@@ -292,9 +291,7 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
 
             self._add_stats(x, sigma, gen, (waste_, npresses_))
-
-            if gen % saving_interval == 0:
-                save_results(filename+".part")
+            save_results(filename+".part")
 
         logger.info(f"Search - Finished the search after {self.max_generations} generations.")
 
