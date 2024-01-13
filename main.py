@@ -1,6 +1,5 @@
 # main.py
 import argparse
-import json
 
 from utils.data_processor import GlulamDataProcessor
 from strategies.evolution_strategy import EvolutionStrategy
@@ -36,21 +35,17 @@ def main(file_path, depth, name, run, mode, overwrite, num_cpus):
     if mode == "ES":
         # Evolutionary Search mode
         evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS, num_cpus=num_cpus)
-        results = evolution_strategy.Search()
+        evolution_strategy.Search(filename, saving_interval=5)
 
     elif mode == "single":
         wr = [22800, 23000, 23500, 23600, 23700, 24900]
         logger.info(f"Running a single run mode with width: {wr} roll widths")
-        evolution_strategy = EvolutionStrategy(data, max_generations=1, num_cpus=num_cpus)
-        results = evolution_strategy.Search(x=wr)
+        evolution_strategy = EvolutionStrategy(data, max_generations=2, num_cpus=num_cpus)
+        evolution_strategy.Search(filename, x=wr)
     else:
         logger.error(f"Unknown mode: {mode}")
         return
 
-    # Save the solution
-    with open(filename, 'w') as f:
-        json.dump(results, f, indent=4)
-    logger.info(f"Saved the solution to {filename}")
 
 
 if __name__ == "__main__":

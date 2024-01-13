@@ -1,5 +1,6 @@
 # evolution_strategy.py
-import logging
+import json
+import os
 
 import numpy as np
 from models.cutting_pattern import ExtendedGlulamPatternProcessor
@@ -180,13 +181,27 @@ class EvolutionStrategy:
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
 
-    def Search(self, x=None):
+    def Search(self, filename, saving_interval=5, x=None):
         """
         The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
         note that there is one problem with this approach, namely that the
         step size may not adapt if the parent is not killed.
+
+        Args:
+            filename (str): File name to save results
+            saving_interval (int): Interval to save intermediate results
+            x (nparray): initial roll widths
         """
         logger.info(f"Initialising the Evolutionary Search")
+
+        def save_results(filename):
+            """ Save results to json. """
+            results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
+                       'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
+            convert_numpy_to_json(results)
+            with open(filename, 'w') as f:
+                json.dump(results, f, indent=4)
+            logger.info(f"Saved the solution to {filename}")
 
         # generate initial unique roll widths, say Objective different configurations
         # this is by default the best solution found so far
@@ -277,8 +292,11 @@ class EvolutionStrategy:
 
             self._add_stats(x, sigma, gen)
 
+            if gen % saving_interval == 0:
+                save_results(filename+".part")
+
         logger.info(f"Search - Finished the search after {self.max_generations} generations.")
 
-        results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
-                   'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
-        return convert_numpy_to_json(results)
+        # Save final results and remove intermediate results
+        save_results(filename)
+        os.remove(filename+".part")
