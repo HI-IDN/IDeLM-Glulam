@@ -31,13 +31,14 @@ pd.set_option('display.precision', 3)
 
 
 class GlulamPackagingProcessor:
-    def __init__(self, pattern_processor, number_of_presses):
+    def __init__(self, pattern_processor, number_of_presses, number_of_regions=GlulamConfig.REGIONS):
         """
         Initializes the GlulamPackagingProcessor with pattern data and the number of presses.
 
         Parameters:
         - pattern_processor (ExtendedGlulamPatternProcessor): Processor containing glulam pattern data.
         - number_of_presses (int): The number of presses available for packaging.
+        - number_of_regions (int): Number of regions in the press that can be used.
         """
         self.patterns = pattern_processor
         """ Pattern data set from GlulamPatternProcessor. """
@@ -45,7 +46,7 @@ class GlulamPackagingProcessor:
         self._number_of_presses = number_of_presses
         """ The number of presses. """
 
-        self._number_of_regions = GlulamConfig.REGIONS
+        self._number_of_regions = number_of_regions
         """ The number of regions. """
 
         self.Waste = None
@@ -152,6 +153,7 @@ class GlulamPackagingProcessor:
         logger.debug(f'Time limit for Gurobi: {time_limit} seconds.')
 
         self.solved = False
+        self.presses_in_use = np.full(self.number_of_presses, False)
         self.RW_counts = False
         self.RW_used = False
         self.ObjectiveValue = None
@@ -171,6 +173,7 @@ class GlulamPackagingProcessor:
 
         # Set time limit
         pmodel.setParam('TimeLimit', time_limit)
+        pmodel.setParam('Threads', self.patterns.num_cpus)
 
         # decision variables
         x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
@@ -232,7 +235,6 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
                           name="if_press_is_not_used_then_x_is_zero")
 
-
         # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
         # h1[k] will indicate that the height of region 0 is less than 24 layers
         pmodel.addConstrs(
@@ -264,8 +266,8 @@ class GlulamPackagingProcessor:
         pmodel._time = time.time()
 
         # solve the model
-        # pmodel.optimize(callback=cb)
-        pmodel.optimize()
+        pmodel.optimize(callback=cb)
+        # pmodel.optimize()
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:

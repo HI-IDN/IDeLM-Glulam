@@ -16,7 +16,8 @@ logger = setup_logger('GlulamES')
 class EvolutionStrategy:
     """ Evolution Strategy class based on the (1+1)-ES algorithm """
 
-    def __init__(self, data, max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
+    def __init__(self, data, num_cpus,
+                 max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
         self.max_generations = max_generations or GlulamConfig.ES_MAX_GENERATIONS
         """ Maximum number of generations to be used in the search. """
 
@@ -42,7 +43,7 @@ class EvolutionStrategy:
         """ Statistics of the search. """
 
         # generate packing patterns from input data
-        self.merged = ExtendedGlulamPatternProcessor(data)
+        self.merged = ExtendedGlulamPatternProcessor(data, num_cpus)
         """ The merged pattern processor. """
 
         self.npresses = None

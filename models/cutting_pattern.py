@@ -12,22 +12,22 @@ merged_logger = setup_logger('ExtendedGlulamPatternProcessor')
 
 
 class GlulamPatternProcessor:
-    def __init__(self, data, roll_width=None):
+    def __init__(self, data, num_cpus, roll_width=GlulamConfig.MAX_ROLL_WIDTH):
         """
         Initializes the GlulamPatternProcessor with the necessary data.
 
         Parameters:
         - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
+        - num_cpus (int): How many cpus can be used in the cutting stock optimisation.
         - roll_width (float, optional): The maximum width available on the roll. Defaults to the value in GlulamConfig.
         """
         self.data = data
 
-        if roll_width is None:
-            self.roll_width = GlulamConfig.MAX_ROLL_WIDTH
-        else:
-            self.roll_width = roll_width
-            assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
-                                                               f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
+        self.num_cpus = num_cpus
+
+        self.roll_width = roll_width
+        assert roll_width <= GlulamConfig.MAX_ROLL_WIDTH, (f"Roll width {roll_width} mm exceeds the maximum roll "
+                                                           f"width {GlulamConfig.MAX_ROLL_WIDTH} mm.")
 
         # Use logger within these modules
         single_logger.info(f"Initialising Glulam Pattern Processor instance with {self.roll_width} roll width.")
@@ -133,6 +133,7 @@ class GlulamPatternProcessor:
             # Create the cutting model
             cut_model = gp.Model("Cutting")
             cut_model.setParam('OutputFlag', 0)
+            cut_model.setParam('Threads', self.num_cpus)
 
             # Decision variables: how often to cut each pattern
             x = cut_model.addVars(self.J)  # Note this a continuous variable in order to get shadow prices later
@@ -180,6 +181,7 @@ class GlulamPatternProcessor:
         # Initialize the knapsack model
         knap_model = gp.Model("Knapsack")
         knap_model.setParam('OutputFlag', 0)  # Suppress output for cleaner execution
+        knap_model.setParam('Threads', self.num_cpus)
 
         # Decision variables for the knapsack problem
         use = knap_model.addVars(self.I, lb=0, vtype=gp.GRB.INTEGER)
@@ -257,14 +259,15 @@ class GlulamPatternProcessor:
 
 
 class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
-    def __init__(self, data):
+    def __init__(self, data, num_cpus):
         """
         Initializes the ExtendedGlulamPatternProcessor with the necessary data.
 
         Parameters:
         - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
+        - num_cpus (int): Number of cpus that can be used in cutting stock optimisation.
         """
-        super().__init__(data, roll_width=None)  # Initialize the base class
+        super().__init__(data, num_cpus)  # Initialize the base class
         self._roll_widths = set()
 
         # Calculate the minimum number of presses needed to pack all orders
@@ -273,13 +276,15 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         merged_logger.info(f"Minimum number of presses needed to pack all orders: {self.min_presses}")
 
         # Calculate the maximum number of presses needed to pack all orders
-        max_number_of_presses = np.sum(data.quantity)  # Worst case scenario: each item is pressed individually
-        press = GlulamPackagingProcessor(self, max_number_of_presses)
+        self.max_presses = np.sum(data.quantity)  # Worst case scenario: each item is pressed individually
+        press = GlulamPackagingProcessor(self, self.max_presses)
         press.pack_n_press()
         if not press.solved:
             merged_logger.error("Cannot solve the packaging problem with too many presses.")
-            #raise Exception("Cannot solve the packaging problem.")
-        self.max_presses = np.sum(press.presses_in_use)
+            # raise Exception("Cannot solve the packaging problem.")
+        else:
+            # Update max presses to what was used when using only initial patterns
+            self.max_presses = np.sum(press.presses_in_use)
 
         merged_logger.info(f"Maximum number of presses needed to pack all orders: {self.max_presses}")
 
@@ -297,7 +302,7 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
             merged_logger.info(f"Roll width {roll_width} already exists in the existing patterns, n={self.n}.")
             return
 
-        pattern = GlulamPatternProcessor(self.data, roll_width)
+        pattern = GlulamPatternProcessor(self.data, self.num_cpus, roll_width=roll_width)
         pattern.cutting_stock_column_generation()
         self._A = np.hstack((self._A, pattern.A))
         self._H = np.concatenate((self._H, pattern.H))
