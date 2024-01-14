@@ -18,7 +18,7 @@ class GlulamConfig:
     DEFAULT_DEPTH = 90  # in mm
 
     # Algorithm settings
-    GUROBI_TIME_LIMIT = 10 * 60  # in seconds
+    GUROBI_TIME_LIMIT = 20 * 60  # in seconds
     GUROBI_NO_IMPROVEMENT_TIME_LIMIT = 1 * 60  # in seconds
     GUROBI_OUTPUT_FLAG = 1  # 0: silent, 1: summary, 2: detailed, 3: verbose
     VERBOSE_LOGGING = False
