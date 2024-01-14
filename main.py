@@ -1,15 +1,15 @@
 # main.py
 import argparse
-import json
 
 from utils.data_processor import GlulamDataProcessor
 from strategies.evolution_strategy import EvolutionStrategy
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import os
+from multiprocessing import cpu_count
 
 
-def main(file_path, depth, name, run, mode, overwrite):
+def main(file_path, depth, name, run, mode, overwrite, num_cpus):
     logger = setup_logger('IDeLM-Glulam')
     logger.info("Starting the Glulam Production Optimizer")
 
@@ -34,22 +34,18 @@ def main(file_path, depth, name, run, mode, overwrite):
 
     if mode == "ES":
         # Evolutionary Search mode
-        evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
-        results = evolution_strategy.Search()
+        evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS, num_cpus=num_cpus)
+        evolution_strategy.Search(filename)
 
     elif mode == "single":
         wr = [22800, 23000, 23500, 23600, 23700, 24900]
         logger.info(f"Running a single run mode with width: {wr} roll widths")
-        evolution_strategy = EvolutionStrategy(data, max_generations=1)
-        results = evolution_strategy.Search(x=wr)
+        evolution_strategy = EvolutionStrategy(data, max_generations=2, num_cpus=num_cpus)
+        evolution_strategy.Search(filename, x=wr)
     else:
         logger.error(f"Unknown mode: {mode}")
         return
 
-    # Save the solution
-    with open(filename, 'w') as f:
-        json.dump(results, f, indent=4)
-    logger.info(f"Saved the solution to {filename}")
 
 
 if __name__ == "__main__":
@@ -78,7 +74,10 @@ if __name__ == "__main__":
         "--overwrite", action="store_true", default=False,
         help="Overwrite existing files (default: %(default)s)"
     )
-
+    parser.add_argument(
+        '--num_cpus', type=int, default=cpu_count(),
+        help="Threads to be used in Gurobi (default: %(default)s)"
+    )
     args = parser.parse_args()
 
-    main(args.file, args.depth, args.name, args.run, args.mode, args.overwrite)
+    main(args.file, args.depth, args.name, args.run, args.mode, args.overwrite, args.num_cpus)

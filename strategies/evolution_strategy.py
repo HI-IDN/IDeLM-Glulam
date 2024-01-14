@@ -1,5 +1,6 @@
 # evolution_strategy.py
-import logging
+import json
+import os
 
 import numpy as np
 from models.cutting_pattern import ExtendedGlulamPatternProcessor
@@ -16,7 +17,8 @@ logger = setup_logger('GlulamES')
 class EvolutionStrategy:
     """ Evolution Strategy class based on the (1+1)-ES algorithm """
 
-    def __init__(self, data, max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
+    def __init__(self, data, num_cpus,
+                 max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
         self.max_generations = max_generations or GlulamConfig.ES_MAX_GENERATIONS
         """ Maximum number of generations to be used in the search. """
 
@@ -42,12 +44,8 @@ class EvolutionStrategy:
         """ Statistics of the search. """
 
         # generate packing patterns from input data
-        self.merged = ExtendedGlulamPatternProcessor(data)
+        self.merged = ExtendedGlulamPatternProcessor(data, num_cpus)
         """ The merged pattern processor. """
-
-        area_press = GlulamConfig.MAX_ROLL_WIDTH * GlulamConfig.MAX_HEIGHT_LAYERS * GlulamConfig.LAYER_HEIGHT / 1e6
-        self.min_presses = np.ceil(self.merged.data.area / area_press).astype(int)
-        """ The minimum number of presses needed to pack all orders. """
 
         self.npresses = None
         """ The number of presses used in the best solution found so far. """
@@ -151,10 +149,13 @@ class EvolutionStrategy:
             press (GlulamPackagingProcessor): the press object
         """
         logger.info(f"Objective - Finding the minimum number of presses needed for a feasible solution.")
-        press = GlulamPackagingProcessor(self.merged, self.min_presses - 1)
+        press = GlulamPackagingProcessor(self.merged, self.merged.min_presses - 1)
         objective = (None, None)
         while not press.solved:
             press.update_number_of_presses(press.number_of_presses + 1)
+            if press.number_of_presses > self.merged.max_presses:
+                logger.info(f"Objective - Failed to find a feasible solution with {self.merged.max_presses} presses.")
+                break
             press.pack_n_press()
             if press.solved:
                 logger.info(f"Objective - Found a feasible solution with {press.number_of_presses} presses "
@@ -164,10 +165,10 @@ class EvolutionStrategy:
 
         return objective, press
 
-    def _add_stats(self, x, sigma, gen):
+    def _add_stats(self, x, sigma, gen, current_obj):
         if self.stats is None:
             self.stats = {'xstar': [], 'sstar': [], 'sucstar': [], 'waste': [], 'npresses': [], 'x': [], 'sigma': [],
-                          'gen': []}
+                          'gen': [], 'npatterns': [], 'objective': []}
         self.stats['xstar'].append(self.xstar)
         self.stats['sstar'].append(self.sstar)
         self.stats['sucstar'].append(self.sucstar)
@@ -176,17 +177,31 @@ class EvolutionStrategy:
         self.stats['x'].append(x)
         self.stats['sigma'].append(sigma)
         self.stats['gen'].append(gen)
+        self.stats['npatterns'].append(self.merged.n)
+        self.stats['objective'].append(current_obj)
         logger.info(
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
 
-    def Search(self, x=None):
+    def Search(self, filename, x=None):
         """
         The Search algorithm is a simple (1+1)-ES using self-adaptive mutation
         note that there is one problem with this approach, namely that the
         step size may not adapt if the parent is not killed.
+
+        Args:
+            filename (str): File name to save results
+            x (nparray): initial roll widths
         """
         logger.info(f"Initialising the Evolutionary Search")
+
+        def save_results(filename):
+            """ Save results to json. """
+            results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
+                       'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
+            with open(filename, 'w') as f:
+                json.dump(convert_numpy_to_json(results), f, indent=4)
+            logger.info(f"Saved the solution to {filename}")
 
         # generate initial unique roll widths, say Objective different configurations
         # this is by default the best solution found so far
@@ -217,7 +232,7 @@ class EvolutionStrategy:
         self.Selection(x, sigma, success, press)
 
         # now lets start the search, for max max_generations
-        self._add_stats(x, sigma, 0)
+        self._add_stats(x, sigma, 0,(self.waste, self.npresses))
         for gen in range(1, self.max_generations):
             logger.info(f"Generation: {gen}/{self.max_generations}")
 
@@ -275,10 +290,12 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the successes are {self.sucstar}")
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
 
-            self._add_stats(x, sigma, gen)
+            self._add_stats(x, sigma, gen, (waste_, npresses_))
+            save_results(filename+".part")
 
         logger.info(f"Search - Finished the search after {self.max_generations} generations.")
 
-        results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
-                   'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
-        return convert_numpy_to_json(results)
+        # Save final results and remove intermediate results
+        save_results(filename)
+        if os.path.exists(filename + ".part"):
+            os.remove(filename + ".part")

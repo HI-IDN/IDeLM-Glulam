@@ -6,23 +6,6 @@ from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import time
 
-
-def cb(model, where):
-    if where == gp.GRB.Callback.MIPNODE:
-        # Get model objective
-        obj = model.cbGet(gp.GRB.Callback.MIPNODE_OBJBST)
-
-        # Has objective changed?
-        if abs(obj - model._cur_obj) > 1e-8:
-            # If so, update incumbent and time
-            model._cur_obj = obj
-            model._time = time.time()
-
-    # Terminate if objective has not improved in 60s
-    if time.time() - model._time > 60:
-        model.terminate()
-
-
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
 
@@ -30,14 +13,54 @@ logger = setup_logger('GlulamPackagingProc')
 pd.set_option('display.precision', 3)
 
 
+def cb(model, where):
+    """
+    Gurobi callback function for logging and termination conditions.
+
+    Logs when the first feasible solution is found and logs termination due to no
+    improvement in GUROBI_NO_IMPROVEMENT_TIME_LIMIT seconds after finding at least one feasible solution.
+
+    Parameters:
+    - model (gurobipy.Model): The Gurobi model.
+    - where (int): Callback code indicating the current Gurobi state.
+    """
+    if where == gp.GRB.Callback.MIP:
+        # Check if a feasible solution is found
+        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not hasattr(model, '_feasible_time'):
+            model._feasible_time = time.time()
+            model._time = time.time()
+            logger.info(
+                f"First feasible solution found after {(model._feasible_time - model._start_time) / 60:.2f} minutes.")
+
+    if where == gp.GRB.Callback.MIPNODE:
+        # Get model objective
+        obj = model.cbGet(gp.GRB.Callback.MIPNODE_OBJBST)
+
+        # Has objective changed?
+        if abs(obj - model._cur_obj) > 1e-8:
+            # Update incumbent and time
+            model._cur_obj = obj
+            model._time = time.time()
+
+    # Terminate if a feasible solution has been found and no improvement for over a minute
+    if hasattr(model, '_feasible_time') and model._feasible_time:
+        if time.time() - model._time > GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT:
+            model._terminated_early = time.time()
+            model.terminate()
+            logger.warning(f"Terminating optimization: no improvement for over "
+                           f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT/60:.0f} minute. "
+                           f"Elapsed time since first feasible solution: "
+                           f"{(model._terminated_early - model._feasible_time) / 60:.2f} minutes.")
+
 class GlulamPackagingProcessor:
-    def __init__(self, pattern_processor, number_of_presses):
+    def __init__(self, pattern_processor, number_of_presses, number_of_regions=GlulamConfig.REGIONS):
         """
         Initializes the GlulamPackagingProcessor with pattern data and the number of presses.
 
         Parameters:
         - pattern_processor (ExtendedGlulamPatternProcessor): Processor containing glulam pattern data.
         - number_of_presses (int): The number of presses available for packaging.
+        - number_of_regions (int): Number of regions in the press that can be used.
         """
         self.patterns = pattern_processor
         """ Pattern data set from GlulamPatternProcessor. """
@@ -45,7 +68,7 @@ class GlulamPackagingProcessor:
         self._number_of_presses = number_of_presses
         """ The number of presses. """
 
-        self._number_of_regions = GlulamConfig.REGIONS
+        self._number_of_regions = number_of_regions
         """ The number of regions. """
 
         self.Waste = None
@@ -148,10 +171,11 @@ class GlulamPackagingProcessor:
         """
 
         # Use logger within these modules
-        # logger.info(f"Starting Pack'n'Press model for {self.number_of_presses} presses.")
-        # logger.info(f'Time limit for Gurobi: {time_limit} seconds.')
+        logger.debug(f"Starting Pack'n'Press model for {self.number_of_presses} presses.")
+        logger.debug(f'Time limit for Gurobi: {time_limit} seconds.')
 
         self.solved = False
+        self.presses_in_use = np.full(self.number_of_presses, False)
         self.RW_counts = False
         self.RW_used = False
         self.ObjectiveValue = None
@@ -171,6 +195,7 @@ class GlulamPackagingProcessor:
 
         # Set time limit
         pmodel.setParam('TimeLimit', time_limit)
+        pmodel.setParam('Threads', self.patterns.num_cpus)
 
         # decision variables
         x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
@@ -213,38 +238,45 @@ class GlulamPackagingProcessor:
             (h[k, 0] >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in self.K[:-1]), name="min_height_R0")
 
+        # now we must fulfill the demand for each item exactly
+        pmodel.addConstrs(
+            (gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
+             == self.b[i] for i in self.I), name="demand_equal_supply")
+
         # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
         # and R1 is at least the minimum height for R1.
         pmodel.addConstrs(
             (gp.quicksum(h[k, r] for r in self.R) >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in self.K[:-1]),
             name="min_height_combined")
-        pmodel.addConstrs(
-            (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
-            name="if_region_1_is_used_then_region_0_is_used")
 
         # if the press is not used the x must be zero
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
                           name="if_press_is_not_used_then_x_is_zero")
-
-        # now we must fulfill the demand for each item exactly
-        pmodel.addConstrs(
-            (gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
-             == self.b[i] for i in self.I), name="demand_equal_supply")
 
         # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
         # h1[k] will indicate that the height of region 0 is less than 24 layers
         pmodel.addConstrs(
             (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
              for k in self.K[:-1]), name="h1_if_region_0_is_less_than_24_layers")
-        pmodel.addConstrs(
-            (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
-             for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
+
+        if self._number_of_regions > 1:
+            pmodel.addConstrs(
+                (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
+                name="if_region_1_is_used_then_region_0_is_used")
+            pmodel.addConstrs(
+                (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
+                 for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
+
+            # make sure that all pattern length in region 1 are smaller than those in region 0
+            pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K),
+                              name="Lp0_greater_than_Lp1")
+
+        # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
 
-        # make sure that all pattern length in region 1 are smaller than those in region 0
-        # make sure that the length of region 0 is longer than region 1
-        pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K), name="Lp0_greater_than_Lp1")
+        # define the surplus of each pattern in each press and region as the difference between the length of the
+        # pattern and the length of the region
         pmodel.addConstrs(
             ((Lp[k, r] - self.L[j]) * self.H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM
              for j in self.J for k in self.K for r in self.R), name="F_surplus_definition")
@@ -255,17 +287,15 @@ class GlulamPackagingProcessor:
             , gp.GRB.MINIMIZE)
 
         # Last updated objective and time
-        pmodel._cur_obj = float('inf')
-        pmodel._time = time.time()
+        pmodel._cur_obj = 1e100
+        pmodel._start_time = time.time()  # Initialize the start time before optimization
 
         # solve the model
-        # pmodel.optimize(callback=cb)
-        pmodel.optimize()
+        pmodel.optimize(callback=cb)
 
         # see if model is infeasible
         if pmodel.status == gp.GRB.INFEASIBLE:
             logger.info(f"Pack'n'Press model for {self.number_of_presses} presses is infeasible; quitting.")
-
             return False
 
         try:
@@ -276,29 +306,31 @@ class GlulamPackagingProcessor:
 
         # Extract the results
         self.solved = True
+        self.presses_in_use = (np.array([any(z[k, r].X for r in self.R) for k in self.K], dtype=bool))
+        logger.info(f'Presses in use: {np.sum(self.presses_in_use)} out of {self.number_of_presses}')
         self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
         self.xn = np.array([[[x[j, k, r].X for r in self.R] for k in self.K] for j in self.J])
         self.RW_used, self.RW_counts = np.unique(
             [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
             return_counts=True)
         row_format = " ".join(["{:>5}"] * len(self.RW_used))
-        # logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
-        # logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
+        logger.debug(f'RW_used:\n{row_format.format(*[str(x) for x in self.RW_used])}')
+        logger.debug(f'RW_counts:\n{row_format.format(*[str(x) for x in self.RW_counts])}')
         self.ObjectiveValue = pmodel.ObjVal
-        # logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
+        logger.debug(f'Objective value: {self.ObjectiveValue:.2f}')
         self.h = np.array([[h[k, r].X for r in self.R] for k in self.K], dtype=int)
-        # logger.debug(f'h:\n{self.h}')
+        logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
-        # logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
+        logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
 
         # Compute the waste
         self.Lp_actual = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
-        # logger.debug(f'Lp actual:\n{self.Lp_actual}')
+        logger.debug(f'Lp actual:\n{self.Lp_actual}')
         self.Waste = np.sum(
             self.H[:, None, None] * (self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x / 1e6,
             axis=0)  # Waste in m^2
-        # logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
-        # logger.debug(f'Waste:\n{self.Waste}')
+        logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
+        logger.debug(f'Waste:\n{self.Waste}')
         return True
 
     def print_results(self):
@@ -430,7 +462,7 @@ class GlulamPackagingProcessor:
         """ Table pertaining to set K (of all presses). """
         logger.info(f'Press information: ({self.number_of_presses} number of presses)')
         df = pd.DataFrame(
-             columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
+            columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
         df['Press'] = [k for k in self.K for r in self.R]
         df['Region'] = [r for k in self.K for r in self.R]
         df['Lp'] = [self.Lp_estimated[k, r] for k in self.K for r in self.R]
