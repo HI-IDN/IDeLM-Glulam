@@ -17,8 +17,7 @@ logger = setup_logger('GlulamES')
 class EvolutionStrategy:
     """ Evolution Strategy class based on the (1+1)-ES algorithm """
 
-    def __init__(self, data, num_cpus,
-                 max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
+    def __init__(self, data, max_generations=None, alpha=0.1, sigma0=5, lamda=10, n_max=None, dn=None, n_min=0):
         self.max_generations = max_generations or GlulamConfig.ES_MAX_GENERATIONS
         """ Maximum number of generations to be used in the search. """
 
@@ -44,7 +43,7 @@ class EvolutionStrategy:
         """ Statistics of the search. """
 
         # generate packing patterns from input data
-        self.merged = ExtendedGlulamPatternProcessor(data, num_cpus)
+        self.merged = ExtendedGlulamPatternProcessor(data)
         """ The merged pattern processor. """
 
         self.npresses = None
@@ -232,7 +231,7 @@ class EvolutionStrategy:
         self.Selection(x, sigma, success, press)
 
         # now lets start the search, for max max_generations
-        self._add_stats(x, sigma, 0,(self.waste, self.npresses))
+        self._add_stats(x, sigma, 0, (self.waste, self.npresses))
         for gen in range(1, self.max_generations):
             logger.info(f"Generation: {gen}/{self.max_generations}")
 
@@ -291,7 +290,7 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
 
             self._add_stats(x, sigma, gen, (waste_, npresses_))
-            save_results(filename+".part")
+            save_results(filename + ".part")
 
         logger.info(f"Search - Finished the search after {self.max_generations} generations.")
 

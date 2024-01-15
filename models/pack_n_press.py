@@ -48,9 +48,10 @@ def cb(model, where):
             model._terminated_early = time.time()
             model.terminate()
             logger.warning(f"Terminating optimization: no improvement for over "
-                           f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT/60:.0f} minute. "
+                           f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT / 60:.0f} minute. "
                            f"Elapsed time since first feasible solution: "
                            f"{(model._terminated_early - model._feasible_time) / 60:.2f} minutes.")
+
 
 class GlulamPackagingProcessor:
     def __init__(self, pattern_processor, number_of_presses, number_of_regions=GlulamConfig.REGIONS):
@@ -195,7 +196,6 @@ class GlulamPackagingProcessor:
 
         # Set time limit
         pmodel.setParam('TimeLimit', time_limit)
-        pmodel.setParam('Threads', self.patterns.num_cpus)
 
         # decision variables
         x = pmodel.addVars(self.J, self.K, self.R, vtype=gp.GRB.INTEGER)
