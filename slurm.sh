@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Default values
-hours=5
-cpus=48
+hours=8
+cpus=12
 mem=3900
 partition=48cpu_192mem
 
@@ -31,12 +31,11 @@ cat > "$job_script" <<EOF
 #SBATCH --cpus-per-task=${cpus}
 #SBATCH --mem-per-cpu=${mem}
 #SBATCH --time=${hours}:00:00
-#SBATCH --output=data/slurm/%x_%j_%a.out
-#SBATCH --error=data/slurm/%x_%j_%a.err
+#SBATCH --output=data/slurm/%x_%a_%j.out
+#SBATCH --error=data/slurm/%x_%a_%j.err
 #SBATCH --array=1-${runs}%${max_sessions}
 
 # Run the command for this array job
-echo make data/$version/soln_ES_d${depth}_\${SLURM_ARRAY_TASK_ID}.json depth=${depth} run=\${SLURM_ARRAY_TASK_ID} VERSION=${version}
 make data/$version/soln_ES_d${depth}_\${SLURM_ARRAY_TASK_ID}.json depth=${depth} run=\${SLURM_ARRAY_TASK_ID} VERSION=${version}
 EOF
 

@@ -28,6 +28,13 @@ class GlulamDataProcessor:
         # Reset index
         self._filtered_data.reset_index(drop=True, inplace=True)
 
+        # Priority items are those defined in the file, but if they are all the same order, then there is no priority
+        # it is the index for the items with column 'priority' set to True (but only if there are some items with False)
+        self._priority_items = []
+        priority_items = self._filtered_data['priority']
+        if priority_items.any() and not priority_items.all():
+            self._priority_items = np.where(priority_items)[0]
+
     @property
     def area(self):
         """ Compute the minimum area needed to fit all orders in square meters. """
@@ -68,6 +75,11 @@ class GlulamDataProcessor:
         """ Set of orders. """
         return sorted(list(set(self.order.tolist())))
 
+    @property
+    def priority_items(self):
+        """ Set of priority items. """
+        return self._priority_items
+
 
 def convert_numpy_to_json(items):
     """ Convert numpy types to json compatible types. """
@@ -81,4 +93,3 @@ def convert_numpy_to_json(items):
         return {k: convert_numpy_to_json(v) for k, v in items.items()}
     if isinstance(items, int) or isinstance(items, float) or isinstance(items, str):
         return items
-

@@ -26,11 +26,11 @@ def cb(model, where):
     """
     if where == gp.GRB.Callback.MIP:
         # Check if a feasible solution is found
-        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not hasattr(model, '_feasible_time'):
-            model._feasible_time = time.time()
+        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not hasattr(model, '_feasible'):
+            model._feasible = time.time()
             model._time = time.time()
             logger.info(
-                f"First feasible solution found after {(model._feasible_time - model._start_time) / 60:.2f} minutes.")
+                f"First feasible solution found after {(model._feasible - model._start_time) / 60:.2f} minutes.")
 
     if where == gp.GRB.Callback.MIPNODE:
         # Get model objective
@@ -43,14 +43,15 @@ def cb(model, where):
             model._time = time.time()
 
     # Terminate if a feasible solution has been found and no improvement for over a minute
-    if hasattr(model, '_feasible_time') and model._feasible_time:
+    if hasattr(model, '_feasible') and model._feasible:
         if time.time() - model._time > GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT:
-            model._terminated_early = time.time()
             model.terminate()
-            logger.warning(f"Terminating optimization: no improvement for over "
-                           f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT / 60:.0f} minute. "
-                           f"Elapsed time since first feasible solution: "
-                           f"{(model._terminated_early - model._feasible_time) / 60:.2f} minutes.")
+            if not hasattr(model, '_terminated'):
+                model._terminated = time.time()
+                logger.warning(f"Terminating optimization: no improvement for over "
+                               f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT / 60:.0f} minute. "
+                               f"Elapsed time since first feasible solution: "
+                               f"{(model._terminated - model._feasible) / 60:.2f} minutes.")
 
 
 class GlulamPackagingProcessor:
@@ -138,6 +139,14 @@ class GlulamPackagingProcessor:
         return self.patterns.I
 
     @property
+    def I_priority(self):
+        """
+        The set of orders that are prioritized. I_priority ⫋ I.
+        They that cannot be in the last press (which can be a partial press).
+        """
+        return self.patterns.data.priority_items
+
+    @property
     def J(self):
         return self.patterns.J
 
@@ -186,6 +195,7 @@ class GlulamPackagingProcessor:
         self.x = None
         self.xn = None
         self.h = None
+        self.run_summary = None
 
         # parameters
         bigM = 1e8  # a big number
@@ -275,13 +285,19 @@ class GlulamPackagingProcessor:
         # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
 
+        # Ensure priority items are not produced in the last press
+        for j in self.J:
+            if any(self.A[i, j] > 0 for i in self.I_priority):  # This pattern produces a priority item
+                pmodel.addConstrs(
+                    (x1[j, k, r] == 0 for k in self.K[:-1] for r in self.R), name="no_priority_in_last_press")
+
         # define the surplus of each pattern in each press and region as the difference between the length of the
         # pattern and the length of the region
         pmodel.addConstrs(
             ((Lp[k, r] - self.L[j]) * self.H[j] <= F[j, k, r] + (1 - x1[j, k, r]) * bigM
              for j in self.J for k in self.K for r in self.R), name="F_surplus_definition")
 
-        # now we add the objective function as the sum of waste for all presses and the difference between demand and supply
+        # the objective function as the sum of waste for all presses and the difference between demand and supply
         pmodel.setObjective(
             gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)
             , gp.GRB.MINIMIZE)
@@ -331,6 +347,23 @@ class GlulamPackagingProcessor:
             axis=0)  # Waste in m^2
         logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
         logger.debug(f'Waste:\n{self.Waste}')
+
+        # Maintain a summary of the run
+        self.run_summary = {
+            'time': int(time.time() - pmodel._start_time),
+            'first_feasible': int(pmodel._feasible - pmodel._start_time) if hasattr(pmodel, '_feasible') else None,
+            'terminated_early': int(pmodel._terminated - pmodel._feasible) if hasattr(pmodel, '_terminated') else None,
+            'nconstrs': pmodel.NumConstrs,
+            'nvars': pmodel.NumVars,
+            'status': pmodel.status,
+            'npatterns': self.patterns.n,
+            'norders': self.patterns.m,
+            'npresses': self.number_of_presses,
+            'npresses_used': np.sum(self.presses_in_use),
+            'objective': self.ObjectiveValue,
+            'total_waste': self.TotalWaste,
+        }
+
         return True
 
     def print_results(self):

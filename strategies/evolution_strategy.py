@@ -164,10 +164,11 @@ class EvolutionStrategy:
 
         return objective, press
 
-    def _add_stats(self, x, sigma, gen, current_obj):
+    def _add_stats(self, x, sigma, gen, press):
         if self.stats is None:
             self.stats = {'xstar': [], 'sstar': [], 'sucstar': [], 'waste': [], 'npresses': [], 'x': [], 'sigma': [],
-                          'gen': [], 'npatterns': [], 'objective': []}
+                          'gen': [], 'run_summary': []
+                          }
         self.stats['xstar'].append(self.xstar)
         self.stats['sstar'].append(self.sstar)
         self.stats['sucstar'].append(self.sucstar)
@@ -176,8 +177,7 @@ class EvolutionStrategy:
         self.stats['x'].append(x)
         self.stats['sigma'].append(sigma)
         self.stats['gen'].append(gen)
-        self.stats['npatterns'].append(self.merged.n)
-        self.stats['objective'].append(current_obj)
+        self.stats['run_summary'].append(press.run_summary)
         logger.info(
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
@@ -197,7 +197,7 @@ class EvolutionStrategy:
         def save_results(filename):
             """ Save results to json. """
             results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
-                       'depth': self.merged.data.depth, 'n': self.merged.n, 'm': self.merged.m}
+                       'depth': self.merged.data.depth }
             with open(filename, 'w') as f:
                 json.dump(convert_numpy_to_json(results), f, indent=4)
             logger.info(f"Saved the solution to {filename}")
@@ -231,7 +231,7 @@ class EvolutionStrategy:
         self.Selection(x, sigma, success, press)
 
         # now lets start the search, for max max_generations
-        self._add_stats(x, sigma, 0, (self.waste, self.npresses))
+        self._add_stats(x, sigma, 0, press)
         for gen in range(1, self.max_generations):
             logger.info(f"Generation: {gen}/{self.max_generations}")
 
@@ -289,7 +289,7 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the successes are {self.sucstar}")
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
 
-            self._add_stats(x, sigma, gen, (waste_, npresses_))
+            self._add_stats(x, sigma, gen, press)
             save_results(filename + ".part")
 
         logger.info(f"Search - Finished the search after {self.max_generations} generations.")

@@ -46,7 +46,6 @@ def main(file_path, depth, name, run, mode, overwrite):
         return
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glulam Production Optimizer")
     parser.add_argument(
