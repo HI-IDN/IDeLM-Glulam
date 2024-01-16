@@ -28,4 +28,4 @@ $(addprefix es_, $(DEPTHS)):
 data/$(VERSION)/soln_ES_d$(depth)_$(run).json:
 	@echo "Running ES for depth $(depth) run $(run)"
 	@mkdir -p data/$(VERSION)
-	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) | tee $(@:.json=.log) 2>&1
+	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) --file $(FILE) | tee $(@:.json=.log) 2>&1

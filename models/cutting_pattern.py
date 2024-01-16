@@ -254,12 +254,13 @@ class GlulamPatternProcessor:
 
 
 class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
-    def __init__(self, data):
+    def __init__(self, data, max_presses=None):
         """
         Initializes the ExtendedGlulamPatternProcessor with the necessary data.
 
         Parameters:
         - data (GlulamDataProcessor): An instance of the GlulamDataProcessor class, which contains the glulam data.
+        - max_presses (int, optional): The maximum number of presses to use. Defaults to the number of orders.
         """
         super().__init__(data)  # Initialize the base class
         self._roll_widths = set()
@@ -269,19 +270,26 @@ class ExtendedGlulamPatternProcessor(GlulamPatternProcessor):
         self.min_presses = np.floor(self.data.area / area_press).astype(int)
         merged_logger.info(f"Minimum number of presses needed to pack all orders: {self.min_presses}")
 
-        # Calculate the maximum number of presses needed to pack all orders
-        self.max_presses = np.sum(data.quantity)  # Worst case scenario: each item is pressed individually
-        press = GlulamPackagingProcessor(self, self.max_presses, 1)
-        press.pack_n_press()
-        if not press.solved:
-            merged_logger.error("Cannot solve the packaging problem with too many presses.")
-            raise Exception(f"Cannot solve the packaging problem. Try increasing GUROBI_TIME_LIMIT currently set "
-                            f"{int(round(GlulamConfig.GUROBI_TIME_LIMIT / 60))} minutes.")
+        if max_presses is None:
+            # If max_presses is not provided, use the number of orders as the maximum number of presses and solve
+            self.max_presses = np.sum(data.quantity)  # Worst case scenario: each item is pressed individually
+            press = GlulamPackagingProcessor(self, self.max_presses, 1)
+            press.pack_n_press()
+            if not press.solved:
+                merged_logger.error("Cannot solve the packaging problem with too many presses.")
+                raise Exception(f"Cannot solve the packaging problem. Try increasing GUROBI_TIME_LIMIT currently set "
+                                f"{int(round(GlulamConfig.GUROBI_TIME_LIMIT / 60))} minutes.")
+            else:
+                # Update max presses to what was used when using only initial patterns
+                self.max_presses = np.sum(press.presses_in_use)
+            merged_logger.info(f"Maximum number of presses needed to pack all orders: {self.max_presses}")
+        elif max_presses >= self.min_presses:
+            self.min_presses = max_presses
+            merged_logger.info(f"Maximum number of presses set to {max_presses}.")
         else:
-            # Update max presses to what was used when using only initial patterns
-            self.max_presses = np.sum(press.presses_in_use)
-
-        merged_logger.info(f"Maximum number of presses needed to pack all orders: {self.max_presses}")
+            merged_logger.error(f"Maximum number of presses {max_presses} is less than the minimum number of "
+                                f"presses {self.min_presses} needed to pack all orders. Aborting.")
+            raise Exception("Maximum number of presses is less than the minimum number of presses needed to pack all.")
 
         merged_logger.debug(f"Initialising Extended Glulam Pattern Processor instance with {self.n} patterns.")
 

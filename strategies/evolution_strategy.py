@@ -197,7 +197,7 @@ class EvolutionStrategy:
         def save_results(filename):
             """ Save results to json. """
             results = {'roll_widths': self.xstar, 'presses': self.npresses, 'waste': self.waste, 'stats': self.stats,
-                       'depth': self.merged.data.depth }
+                       'depth': self.merged.data.depth}
             with open(filename, 'w') as f:
                 json.dump(convert_numpy_to_json(results), f, indent=4)
             logger.info(f"Saved the solution to {filename}")
@@ -288,6 +288,7 @@ class EvolutionStrategy:
                     logger.info(f"NEW BEST: the step sizes are {self.sstar}")
                     logger.info(f"NEW BEST: the successes are {self.sucstar}")
                     logger.info(f"NEW BEST: the number of patterns is {self.merged.n}")
+                    press.save(filename.replace('.json', '.csv'))
 
             self._add_stats(x, sigma, gen, press)
             save_results(filename + ".part")

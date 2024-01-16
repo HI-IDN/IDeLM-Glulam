@@ -5,6 +5,9 @@ import numpy as np
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import time
+import json
+from utils.data_processor import convert_numpy_to_json
+from utils.plotter import get_press_layout, plot_rectangles
 
 # Setup logger
 logger = setup_logger('GlulamPackagingProc')
@@ -325,7 +328,7 @@ class GlulamPackagingProcessor:
         self.presses_in_use = (np.array([any(z[k, r].X for r in self.R) for k in self.K], dtype=bool))
         logger.info(f'Presses in use: {np.sum(self.presses_in_use)} out of {self.number_of_presses}')
         self.x = np.array([[[x[j, k, r].X > 0.1 for r in self.R] for k in self.K] for j in self.J], dtype=bool)
-        self.xn = np.array([[[x[j, k, r].X for r in self.R] for k in self.K] for j in self.J])
+        self.xn = np.array([[[x[j, k, r].X for r in self.R] for k in self.K] for j in self.J], dtype=int)
         self.RW_used, self.RW_counts = np.unique(
             [self.RW[j] for j in self.J for k in self.K for r in self.R if self.x[j, k, r]],
             return_counts=True)
@@ -526,3 +529,18 @@ class GlulamPackagingProcessor:
         print(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
         print(f'Number of patterns in press: {np.sum(df["Patterns"])}')
         print(f'Number of items in press: {np.sum(df["Items"])}')
+
+    def save(self, filename, filename_png=None):
+        """ Save results to csv and png. """
+        assert self.solved, "Model must be solved before saving results."
+        assert filename.endswith('.csv'), "Filename must end with .csv"
+        rects = get_press_layout(self, filename)
+        logger.info(f"Saved rectangle results to {filename}.")
+
+        if filename_png is not None:
+            assert filename_png.endswith('.png'), "Filename must end with .png"
+            try:
+                plot_rectangles(rects, filename_png)
+                logger.info(f"Plotted press to {filename_png}.")
+            except:
+                logger.error(f"Failed to plot press to {filename_png}.")
