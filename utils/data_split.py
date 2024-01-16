@@ -22,7 +22,7 @@ def main(file_path, depth, presses_per_file, subset_folder):
 
     def save_subset(subset_data, filename):
         # Group by order, width, height, and layers and sum the quantity
-        subset_data = subset_data.groupby(['order', 'width', 'height', 'layers']).sum().reset_index()
+        subset_data = subset_data.groupby(['order', 'depth', 'width', 'height', 'layers']).sum().reset_index()
         subset_data.to_csv(filename, index=False)
         print(f"Saved subset to {filename}")
 
