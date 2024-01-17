@@ -236,6 +236,7 @@ class EvolutionStrategy:
             logger.info(f"Generation: {gen}/{self.max_generations}")
 
             self.lamda = len(self.xstar)  # each parent generates one child (could be more in theory)
+            assert len(self.xstar) > 0, "No roll widths left to mutate"  # TODO why is this happening?
             tau_ = 1 / np.sqrt(2 * len(self.xstar))
             tau = 1 / np.sqrt(2 * np.sqrt(len(self.xstar)))
             # use the one-fifth rule to adapt the step size
