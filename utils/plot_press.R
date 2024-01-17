@@ -1,6 +1,7 @@
 library(tidyverse)
 library(ggpattern)
 library(scales)
+theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 
 plot_press <- function(file) {
   press <- read_csv(file)
