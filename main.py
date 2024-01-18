@@ -53,6 +53,7 @@ def main(file_path, depth, name, run, mode, overwrite, roll_widths, max_presses)
 
     elif mode == "single":
         assert roll_widths is not None and len(roll_widths) > 0, "Roll widths must be provided in single run mode"
+        assert max_presses is not None and max_presses > 0, "Number of presses must be provided in single run mode"
         logger.info(f"Running a single run mode with width: {roll_widths} roll widths")
         pattern = ExtendedGlulamPatternProcessor(data, max_presses)
         for roll_width in roll_widths:
