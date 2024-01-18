@@ -4,7 +4,7 @@
 NUM_RUNS := 10
 
 # Create a sequence of runs
-RUNS := $(shell seq 0 $(shell expr $(NUM_RUNS) - 1))
+RUNS := $(shell seq 1 $(shell expr $(NUM_RUNS)))
 
 # Retrieve git tag, fall back to short commit hash if no tags are found
 VERSION := $(shell git describe --tags --always --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
@@ -22,10 +22,11 @@ es:
 # Define a rule for each run for ES mode
 $(addprefix es_, $(DEPTHS)):
 	@$(foreach run,$(RUNS), \
-		make data/$(VERSION)/soln_ES_d$(depth)_$(run).log depth=$(depth) run=$(run);)
+		make data/$(VERSION)/soln_ES_d$(depth)_$(run).json depth=$(depth) run=$(run);)
 
 
 data/$(VERSION)/soln_ES_d$(depth)_$(run).json:
 	@echo "Running ES for depth $(depth) run $(run)"
 	@mkdir -p data/$(VERSION)
-	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) --file $(FILE) | tee $(@:.json=.log) 2>&1
+	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) \
+		--file $(or $(FILE),$(error Missing data file)) | tee $(@:.json=.log) 2>&1
