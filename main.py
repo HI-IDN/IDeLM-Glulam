@@ -49,7 +49,12 @@ def main(file_path, depth, name, run, mode, overwrite, roll_widths, max_presses)
     if mode == "ES":
         # Evolutionary Search mode
         evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
-        evolution_strategy.Search(filename, x=roll_widths)
+        while True:
+            try:
+                evolution_strategy.Search(filename, x=roll_widths)
+                break
+            except Exception as e:
+                logger.error(f"Exception occurred: {e}. Trying again.")
 
     elif mode == "single":
         assert roll_widths is not None and len(roll_widths) > 0, "Roll widths must be provided in single run mode"
