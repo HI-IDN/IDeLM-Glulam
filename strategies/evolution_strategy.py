@@ -96,7 +96,7 @@ class EvolutionStrategy:
             x_ (list): the mutated roll widths
             s_ (list): the mutated step sizes
         """
-        x_ = np.zeros(len(x))
+        x_ = np.zeros(len(x), dtype=int)
         s_ = s.copy()
         eta1 = tau_ * np.random.randn()  # global steps size
         for i in range(len(x)):
@@ -127,9 +127,9 @@ class EvolutionStrategy:
 
         # extract the roll widths used in the press
         I = range(len(x))
-        rw_used = np.array([x[i] for i in I if x[i] in press.RW_used])
-        sa_used = np.array([s[i] for i in I if x[i] in press.RW_used])
-        success_used = np.array([success[i] for i in I if x[i] in press.RW_used])
+        rw_used = np.array([x[i] for i in I if x[i] in press.RW_used], dtype=int)
+        sa_used = np.array([s[i] for i in I if x[i] in press.RW_used], dtype=float)
+        success_used = np.array([success[i] for i in I if x[i] in press.RW_used], dtype=int)
 
         self.xstar = rw_used
         self.sstar = sa_used
@@ -209,7 +209,7 @@ class EvolutionStrategy:
             x = np.random.choice(range(0, self.n_max, self.dn), size=self.lamda, replace=False)
         elif isinstance(x, list):
             logger.info(f"Using {len(x)} roll widths from input")
-            x = np.array(x)
+            x = np.array(x, dtype=int)
         elif not isinstance(x, np.ndarray):
             logger.error(f"Unknown type for x: {type(x)}")
             return None
@@ -217,8 +217,8 @@ class EvolutionStrategy:
             logger.info(f"Using {len(x)} roll widths from input")
 
         logger.info(f"Initialising the search parameters")
-        sigma = self.sigma0 * np.ones(self.lamda)
-        success = np.ones(self.lamda)
+        sigma = self.sigma0 * np.ones(self.lamda, dtype=float)
+        success = np.ones(self.lamda, dtype=int)
         for roll_width in x:
             self.merged.add_roll_width(roll_width)
         (self.waste, self.npresses), press = self.Objective()
