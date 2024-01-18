@@ -3,8 +3,7 @@ library(cowplot)
 theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 
 read_file <- function(file_name) {
-  # run is number just before .json
-  run <- as.integer(str_extract(file_name, "\\d+(?=\\.json)"))
+  print(file_name)
   json <- jsonlite::fromJSON(file_name)
   depth <- json$depth
   stats_tibble <- data.frame(
@@ -17,7 +16,7 @@ read_file <- function(file_name) {
     x = I(json$stats$x),
     sigma = I(json$stats$sigma),
     depth = depth,
-    run = as.factor(run)
+    run = file_name
     #run_summary = ifelse(is.null(json$stats$run_summary), NULL, I(json$stats$run_summary)),
   )
 }
@@ -50,15 +49,19 @@ plot_depth <- function(run_depth) {
 files <- list.files("data/v1.0/", pattern = "\\.json|\\.json.part$", full.names = TRUE)
 combined_data <- map_df(files, read_file)
 combined_data %>%
-  group_by(depth, run) %>%
-  tally()
+  group_by(depth) %>%
+  summarise(
+    runs = length(unique(run)),
+    min_presses = min(npresses),
+    max_presses = max(npresses),
+  )
 
 p90a <- ggplot()
 p90b <- ggplot()
 p115 <- plot_depth(115)
 p140 <- plot_depth(140)
-p160 <- ggplot()
-p185 <- ggplot()
+p160 <- plot_depth(160)
+p185 <- plot_depth(185)
 combined_plot <- plot_grid(p90a, p90b, p115, p140, p160, p185, ncol = 2, align = "hv", rel_heights = c(1, 1),
                            labels = c("a) 90mm #1", "b) 90mm #2", "c) 115mm", "d) 140mm", "e) 160mm", "f) 185mm"),
                            label_size = 10)

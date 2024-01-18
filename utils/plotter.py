@@ -24,15 +24,10 @@ def get_press_layout(press, filename=None):
     for k in press.K:
         y_pos = 0  # Initialize y position for vertical stacking
         for r in press.R:
-            # Draw the actual Lp in gray
-            rects = rects._append({'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH, 'y': y_pos,
-                                   'w': -press.Lp_estimated[k][r], 'h': press.h[k][r], 'type': 'Lp',
-                                   'sub_type': 'estimated'}, ignore_index=True)
-
-            # Draw the estimated Lp in white
-            rects = rects._append({'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH, 'y': y_pos,
-                                   'w': -press.Lp_actual[k][r], 'h': press.h[k][r], 'type': 'Lp',
-                                   'sub_type': 'actual'}, ignore_index=True)
+            # Draw press region
+            rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][r], 'y': y_pos,
+                    'w': press.Lp_estimated[k][r], 'h': press.h[k][r], 'type': 'Lp', 'sub_type': 'estimated'}
+            rects.loc[len(rects)] = rect
 
             # All patterns used in the press
             patterns = [{
@@ -45,25 +40,32 @@ def get_press_layout(press, filename=None):
 
             # order by descending width
             patterns = sorted(patterns, key=lambda x: x['width'], reverse=True)
+            # find the buffer pattern, and move it to the end
+            buffer_pattern = next((p for p in patterns if press.A[press.buffer_item, p['id']] > 0), None)
+            if buffer_pattern:
+                patterns.remove(buffer_pattern)
+                patterns.append(buffer_pattern)
 
             # Start from the top of the previous group (or 0 if first group)
             y_pos = 0 if r == 0 else press.h[k][r - 1]
             for pattern in patterns:
                 # Draw rectangles for each cutting pattern, stacking up vertically and right aligned to the roll width
                 for repeat in range(pattern['repeat']):
-                    rects = rects._append({'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH, 'y': y_pos,
-                                           'w': -pattern['width'], 'h': pattern['height'], 'type': 'pattern',
-                                           'sub_type': pattern['id']}, ignore_index=True)
+                    rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - pattern['width'], 'y': y_pos,
+                            'w': pattern['width'], 'h': pattern['height'], 'type': 'pattern',
+                            'sub_type': pattern['id'] if pattern != buffer_pattern else 'buffer'}
+                    rects.loc[len(rects)] = rect
 
                     x_pos = GlulamConfig.MAX_ROLL_WIDTH  # Initialize x position for horizontal stacking
                     for (item, item_count) in pattern['pattern']:
                         # Draw the actual item
                         for _ in range(item_count):
-                            rects = rects._append({'k': k, 'r': r, 'x': x_pos, 'y': y_pos,
-                                                   'w': -press.patterns.data.widths[item],
-                                                   'h': press.patterns.data.layers[item], 'type': 'item',
-                                                   'sub_type': item, 'order': press.patterns.data.order[item]},
-                                                  ignore_index=True)
+                            rect = {'k': k, 'r': r, 'x': x_pos - press.patterns.data.widths[item], 'y': y_pos,
+                                    'w': press.patterns.data.widths[item],
+                                    'h': press.patterns.data.layers[item], 'type': 'item',
+                                    'sub_type': item if pattern != buffer_pattern else -1,
+                                    'order': press.patterns.data.order[item]}
+                            rects.loc[len(rects)] = rect
 
                             assert press.patterns.data.layers[item] == pattern['height'], \
                                 f"Layer height mismatch: {press.patterns.data.layers[item]} != {pattern['height']}"
@@ -92,6 +94,8 @@ def plot_rectangles(rects, filename=None):
     num_cols = math.ceil(math.sqrt(num_presses))
     num_rows = math.ceil(num_presses / num_cols)
     color = sns.color_palette("hls", len(rects['sub_type'].unique())).as_hex()
+    # set buffer color to black, find the rect with sub_type == -1
+    color[rects['sub_type'].unique().tolist().index(-1)] = '#000000'
 
     # Create figure and axes
     fig, axs = plt.subplots(num_rows, num_cols, figsize=(2 * num_cols, 3 * num_rows))

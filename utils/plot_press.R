@@ -6,9 +6,8 @@ theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 plot_press <- function(file) {
   press <- read_csv(file)
   area <- press %>%
-    filter(sub_type != 'actual') %>%
     group_by(type) %>%
-    mutate(h = h * 0.045, w = abs(w) / 1e3, area = h * w) %>%
+    mutate(h = h * 0.045, w = w / 1e3, area = h * w) %>%
     summarise(area = sum(area))
   items <- press %>%
     filter(type == 'item') %>%
@@ -22,7 +21,7 @@ plot_press <- function(file) {
                  "Area: ", round(total_area, 2), "m\u00b2, ",
                  "Waste:", round(total_area - used_area, 2), "m\u00b2")
 
-  press_block <- press %>% filter(type == 'Lp' & sub_type == 'actual')
+  press_block <- press %>% filter(type == 'Lp')
   plot <- ggplot(data = items, aes(x = x, y = y)) +
     # Waste
     geom_rect_pattern(
