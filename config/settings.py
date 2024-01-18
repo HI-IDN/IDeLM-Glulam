@@ -12,7 +12,6 @@ class GlulamConfig:
     MIN_HEIGHT_LAYER_REGION = [11, 26]  # Region 0 must be at least 11 layers, Region 1 must be at least 24 layers
 
     # Cutting pattern settings
-    SURPLUS_LIMIT = .10  # in pieces
     BUFFER_LIMIT = 2  # in pieces
     ROLL_WIDTH_TOLERANCE = 100  # in mm
 

@@ -136,12 +136,8 @@ class GlulamPatternProcessor:
             # Objective: Minimize the total number of patterns used
             cut_model.setObjective(gp.quicksum(x[j] for j in self.J), gp.GRB.MINIMIZE)
 
-            # Constraints: Ensure all orders are satisfied
-            cut_model.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
-                                 for i in self.I)
-
-            # Constraints: Ensure pieces are left over
-            cut_model.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i]
+            # Constraints: Ensure all orders are satisfied exactly
+            cut_model.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) == self.b[i]
                                  for i in self.I)
 
             # Solve the master problem
@@ -149,7 +145,6 @@ class GlulamPatternProcessor:
 
             # Retrieve the dual prices from the constraints
             pi = [c.Pi for c in cut_model.getConstrs()]
-            pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]  # Adjust for the surplus constraints
 
             # Solve the column generation sub problem
             bailout = self._column_generation_subproblem(pi)
