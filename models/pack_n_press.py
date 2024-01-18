@@ -1,12 +1,9 @@
-import logging
 import pandas as pd
 import gurobipy as gp
 import numpy as np
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import time
-import json
-from utils.data_processor import convert_numpy_to_json
 from utils.plotter import get_press_layout, plot_rectangles
 
 # Setup logger
@@ -29,7 +26,7 @@ def cb(model, where):
     """
     if where == gp.GRB.Callback.MIP:
         # Check if a feasible solution is found
-        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not hasattr(model, '_feasible'):
+        if model.cbGet(gp.GRB.Callback.MIP_SOLCNT) > 0 and not model._feasible:
             model._feasible = time.time()
             model._time = time.time()
             logger.info(
@@ -46,10 +43,10 @@ def cb(model, where):
             model._time = time.time()
 
     # Terminate if a feasible solution has been found and no improvement for over a minute
-    if hasattr(model, '_feasible') and model._feasible:
+    if model._feasible:
         if time.time() - model._time > GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT:
             model.terminate()
-            if not hasattr(model, '_terminated'):
+            if not model._terminated:
                 model._terminated = time.time()
                 logger.warning(f"Terminating optimization: no improvement for over "
                                f"{GlulamConfig.GUROBI_NO_IMPROVEMENT_TIME_LIMIT / 60:.0f} minute. "
@@ -331,6 +328,8 @@ class GlulamPackagingProcessor:
         # Last updated objective and time
         pmodel._cur_obj = 1e100
         pmodel._start_time = time.time()  # Initialize the start time before optimization
+        pmodel._feasible = None
+        pmodel._terminated = None
 
         # solve the model
         pmodel.optimize(callback=cb)
@@ -379,8 +378,8 @@ class GlulamPackagingProcessor:
         # Maintain a summary of the run
         self.run_summary = {
             'time': int(time.time() - pmodel._start_time),
-            'first_feasible': int(pmodel._feasible - pmodel._start_time) if hasattr(pmodel, '_feasible') else None,
-            'terminated_early': int(pmodel._terminated - pmodel._feasible) if hasattr(pmodel, '_terminated') else None,
+            'first_feasible': int(pmodel._feasible - pmodel._start_time) if pmodel._feasible else None,
+            'terminated_early': int(pmodel._terminated - pmodel._feasible) if pmodel._terminated else None,
             'nconstrs': pmodel.NumConstrs,
             'nvars': pmodel.NumVars,
             'status': pmodel.status,

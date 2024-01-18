@@ -124,7 +124,6 @@ class GlulamPatternProcessor:
         - A (matrix): Final pattern matrix.
         - x (dict): Quantities for each pattern to be cut.
         """
-
         bailout = False
         while not bailout:
             # Create the cutting model
@@ -140,19 +139,17 @@ class GlulamPatternProcessor:
             # Constraints: Ensure all orders are satisfied
             cut_model.addConstrs(gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= self.b[i]
                                  for i in self.I)
-            # Constraints: Ensure no more than MAX_SURPLUS_QUANTITY pieces are left over
-            if GlulamConfig.SURPLUS_LIMIT > 0:
-                cut_model.addConstrs(
-                    -gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i] - GlulamConfig.SURPLUS_LIMIT
-                    for i in self.I)
+
+            # Constraints: Ensure pieces are left over
+            cut_model.addConstrs(-gp.quicksum(self._A[i, j] * x[j] for j in self.J) >= -self.b[i]
+                                 for i in self.I)
 
             # Solve the master problem
             cut_model.optimize()
 
             # Retrieve the dual prices from the constraints
             pi = [c.Pi for c in cut_model.getConstrs()]
-            if GlulamConfig.SURPLUS_LIMIT > 0:  # Adjust the dual prices if surplus limit is used
-                pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]
+            pi = [pi[i] - pi[i + self.data.m] for i in range(self.data.m)]  # Adjust for the surplus constraints
 
             # Solve the column generation sub problem
             bailout = self._column_generation_subproblem(pi)
