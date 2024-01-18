@@ -12,12 +12,13 @@ plot_press <- function(file) {
   items <- press %>%
     filter(type == 'item') %>%
     mutate(item = as.factor(as.numeric(sub_type) + 1))
+  buffer <- press %>% filter(type == 'buffer')
 
   total_area <- area %>% filter(type == 'Lp') %>% pull(area)
   used_area <- area %>% filter(type == 'item') %>% pull(area)
   info <- paste0("Depth: ", gsub(".*_d(\\d+).*", "\\1", file), "mm, ",
                  "Presses: ", max(press$k) + 1, ', ',
-                 "Items: ", length(levels(items$item)), ', ',
+                 "Items: ", length(levels(items)), ', ',
                  "Area: ", round(total_area, 2), "m\u00b2, ",
                  "Waste:", round(total_area - used_area, 2), "m\u00b2")
 
@@ -41,6 +42,13 @@ plot_press <- function(file) {
     geom_rect(
       aes(xmin = x, xmax = x + w, ymin = y, ymax = y + h, fill = item),
       color = 'black', linewidth = 0.1,
+    ) +
+    # Buffer
+    geom_rect_pattern(
+      data = buffer,
+      aes(xmin = x, xmax = x + w, ymin = y, ymax = y + h),
+      pattern_color = "black", pattern_fill = "black",
+      fill = NA, color = 'black', linewidth = 0.1,
     ) +
     scale_fill_viridis_d(name = 'Item', guide = "none") +
     facet_wrap(~k, labeller = as_labeller(function(value) { paste("Press #", as.numeric(value) + 1) })) +

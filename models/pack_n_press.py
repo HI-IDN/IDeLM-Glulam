@@ -142,6 +142,17 @@ class GlulamPackagingProcessor:
         return self.patterns.I
 
     @property
+    def buffer_item(self):
+        """
+        A buffer item that is used to fill the last layer of the press.
+
+        It is a dummy item with no demand, a single layer height and its width is determined by its region (i.e. Lp).
+        """
+        return {'order': 'buffer', 'quantity': 0, 'priority': False,
+                'depth': self.patterns.data.depth, 'width': GlulamConfig.MAX_ROLL_WIDTH,
+                'height': GlulamConfig.LAYER_HEIGHT, 'layers': 1}
+
+    @property
     def I_priority(self):
         """
         The set of orders that are prioritized. I_priority ⫋ I.
@@ -198,6 +209,7 @@ class GlulamPackagingProcessor:
         self.x = None
         self.xn = None
         self.h = None
+        self.buffer = None
         self.run_summary = None
 
         # parameters
@@ -232,6 +244,9 @@ class GlulamPackagingProcessor:
         F = pmodel.addVars(self.J, self.K, self.R)
         """ The surplus of pattern j in press k and region r. """
 
+        B = pmodel.addVars(self.K, vtype=gp.GRB.INTEGER)
+        """ The number of buffer items in each press. """
+
         # indicate if a pattern is used or not in press k region r
         pmodel.addConstrs((x1[j, k, r] * bigM >= x[j, k, r] for j in self.J for k in self.K for r in self.R),
                           name="x1_definition")
@@ -243,23 +258,27 @@ class GlulamPackagingProcessor:
 
         # the total height of the region must be less than the maximum height of the press
         pmodel.addConstrs(
-            (gp.quicksum(h[k, r] for r in self.R) <= GlulamConfig.MAX_HEIGHT_LAYERS for k in self.K),
+            (gp.quicksum(h[k, r] for r in self.R) + B[k] <= GlulamConfig.MAX_HEIGHT_LAYERS for k in self.K),
             name="max_height")
 
         # h[k,0] is the height of the R0 in press k, and we must make sure that it is at least the minimum height
+        # not including the buffer item (because it's implied they go on top of all other items)
         pmodel.addConstrs(
             (h[k, 0] >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[0] - (1 - z[k, 0]) * bigM for k in self.K[:-1]), name="min_height_R0")
 
-        # now we must fulfill the demand for each item exactly
+        # now we must fulfill the demand for each item exactly (unless it is the buffer item)
         pmodel.addConstrs(
             (gp.quicksum(self.A[i, j] * x[j, k, r] for j in self.J for k in self.K for r in self.R)
              == self.b[i] for i in self.I), name="demand_equal_supply")
 
+        # Limit the number of buffer items in each press
+        pmodel.addConstrs((B[k] <= GlulamConfig.BUFFER_LIMIT for k in self.K), name="buffer_items_limit")
+
         # If we have two regions (i.e. R0 and R1 - never just R1) then we must make sure that the combined height of R0
         # and R1 is at least the minimum height for R1.
         pmodel.addConstrs(
-            (gp.quicksum(h[k, r] for r in self.R) >=
+            (gp.quicksum(h[k, r] for r in self.R) + B[k] >=
              GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - (1 - z[k, 0]) * bigM for k in self.K[:-1]),
             name="min_height_combined")
 
@@ -267,23 +286,26 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
                           name="if_press_is_not_used_then_x_is_zero")
 
-        # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
         # h1[k] will indicate that the height of region 0 is less than 24 layers
         pmodel.addConstrs(
             (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
-             for k in self.K[:-1]), name="h1_if_region_0_is_less_than_24_layers")
+             for k in self.K[:-1]), name="h1_if_region_0_is_less_than_min_layers")
 
         if self._number_of_regions > 1:
+            # if region 1 is used then region 0 must be used
             pmodel.addConstrs(
                 (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
-                name="if_region_1_is_used_then_region_0_is_used")
+                name="if_region1_then_region0")
+
+            # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
             pmodel.addConstrs(
                 (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
-                 for r in self.R for k in self.K[:-1]), name="Lp_if_region_0_is_less_than_24_layers")
+                 for r in self.R for k in self.K[:-1]), name="Lp_minimum_length")
 
             # make sure that all pattern length in region 1 are smaller than those in region 0
-            pmodel.addConstrs((Lp[k, 0] >= Lp[k, 1] - (1 - z[k, 1]) * bigM for k in self.K),
-                              name="Lp0_greater_than_Lp1")
+            pmodel.addConstrs(
+                (Lp[k, 0] >= Lp[k, 1] + GlulamConfig.MINIMUM_REGION_DIFFERENCE - (1 - z[k, 1]) * bigM for k in self.K),
+                name="Lp0_greater_than_Lp1")
 
         # make sure that the length of the region is at least the length of the longest pattern in use
         pmodel.addConstrs(Lp[k, r] >= x1[j, k, r] * self.L[j] for j in self.J for r in self.R for k in self.K)
@@ -302,7 +324,8 @@ class GlulamPackagingProcessor:
 
         # the objective function as the sum of waste for all presses and the difference between demand and supply
         pmodel.setObjective(
-            gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)
+            gp.quicksum(F[j, k, r] for j in self.J for k in self.K for r in self.R)  # total waste
+            + gp.quicksum(B[k] for k in self.K)  # number of buffer item used
             , gp.GRB.MINIMIZE)
 
         # Last updated objective and time
@@ -341,6 +364,8 @@ class GlulamPackagingProcessor:
         logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
         logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
+        self.buffer = np.array([B[k].X for k in self.K], dtype=int)
+        logger.debug(f'B:\t{", ".join([str(x) for x in self.buffer])}')
 
         # Compute the waste
         self.Lp_actual = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
@@ -375,7 +400,7 @@ class GlulamPackagingProcessor:
         self.table_set_I()
         self.table_set_J()
         self.table_set_K()
-        self.print_item_results()
+        # self.print_item_results()
 
     def print_item_results(self):
         if not self.solved:
@@ -512,11 +537,13 @@ class GlulamPackagingProcessor:
         df['Patterns'] = [np.sum(self.xn[:, k, r]) for k in self.K for r in self.R]
         df['Items'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.xn, axis=(1, 0))[k, r]
                        for k in self.K for r in self.R]
+        df['Buffer'] = [self.buffer[k] if r == 0 else 0 for k in self.K for r in self.R]
 
         print("\n\nTable: Press & Region Information\n")
         print(df)
 
-        df_ = df.groupby(['Press']).agg({'Area': 'sum', 'Waste': 'sum', 'Patterns': 'sum', 'Items': 'sum'})
+        df_ = df.groupby(['Press']).agg({'Area': 'sum', 'Waste': 'sum', 'Patterns': 'sum', 'Items': 'sum',
+                                         'Buffer': 'sum'})
         print("\n\nTable: Press Information\n")
         print(df_)
 
@@ -529,6 +556,7 @@ class GlulamPackagingProcessor:
         print(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
         print(f'Number of patterns in press: {np.sum(df["Patterns"])}')
         print(f'Number of items in press: {np.sum(df["Items"])}')
+        print(f'Number of buffer items in press: {np.sum(self.buffer)}')
 
     def save(self, filename, filename_png=None):
         """ Save results to csv and png. """
@@ -539,8 +567,5 @@ class GlulamPackagingProcessor:
 
         if filename_png is not None:
             assert filename_png.endswith('.png'), "Filename must end with .png"
-            try:
-                plot_rectangles(rects, filename_png)
-                logger.info(f"Plotted press to {filename_png}.")
-            except:
-                logger.error(f"Failed to plot press to {filename_png}.")
+            plot_rectangles(rects, filename_png)
+            logger.info(f"Plotted press to {filename_png}.")

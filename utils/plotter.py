@@ -23,7 +23,11 @@ def get_press_layout(press, filename=None):
     # Plot each group
     for k in press.K:
         y_pos = 0  # Initialize y position for vertical stacking
+        last_r = None
         for r in press.R:
+            if press.Lp_estimated[k][r] == 0:
+                continue
+            last_r = r
             # Draw press region
             rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][r], 'y': y_pos,
                     'w': press.Lp_estimated[k][r], 'h': press.h[k][r], 'type': 'Lp', 'sub_type': 'estimated'}
@@ -33,18 +37,13 @@ def get_press_layout(press, filename=None):
             patterns = [{
                 'id': j,
                 'pattern': [(i, press.A[i][j]) for i in press.I if press.A[i][j] > 0],
-                'height': press.H[j] / GlulamConfig.LAYER_HEIGHT,
+                'height': int(press.H[j] / GlulamConfig.LAYER_HEIGHT),
                 'width': press.L[j],
                 'repeat': int(press.xn[j][k][r])}
                 for j in press.J if press.x[j][k][r]]
 
             # order by descending width
             patterns = sorted(patterns, key=lambda x: x['width'], reverse=True)
-            # find the buffer pattern, and move it to the end
-            buffer_pattern = next((p for p in patterns if press.A[press.buffer_item, p['id']] > 0), None)
-            if buffer_pattern:
-                patterns.remove(buffer_pattern)
-                patterns.append(buffer_pattern)
 
             # Start from the top of the previous group (or 0 if first group)
             y_pos = 0 if r == 0 else press.h[k][r - 1]
@@ -53,7 +52,7 @@ def get_press_layout(press, filename=None):
                 for repeat in range(pattern['repeat']):
                     rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - pattern['width'], 'y': y_pos,
                             'w': pattern['width'], 'h': pattern['height'], 'type': 'pattern',
-                            'sub_type': pattern['id'] if pattern != buffer_pattern else 'buffer'}
+                            'sub_type': pattern['id']}
                     rects.loc[len(rects)] = rect
 
                     x_pos = GlulamConfig.MAX_ROLL_WIDTH  # Initialize x position for horizontal stacking
@@ -63,7 +62,7 @@ def get_press_layout(press, filename=None):
                             rect = {'k': k, 'r': r, 'x': x_pos - press.patterns.data.widths[item], 'y': y_pos,
                                     'w': press.patterns.data.widths[item],
                                     'h': press.patterns.data.layers[item], 'type': 'item',
-                                    'sub_type': item if pattern != buffer_pattern else -1,
+                                    'sub_type': item,
                                     'order': press.patterns.data.order[item]}
                             rects.loc[len(rects)] = rect
 
@@ -72,6 +71,15 @@ def get_press_layout(press, filename=None):
                             x_pos -= press.patterns.data.widths[item]  # Update x position for next rectangle
 
                     y_pos += pattern['height']  # Update y position for next rectangle
+
+        # Plot the buffer used in the press
+        for buffer in range(press.buffer[k]):
+            rect = {'k': k, 'r': last_r,
+                    'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][last_r], 'y': y_pos,
+                    'w': press.Lp_estimated[k][last_r], 'h': 1,
+                    'type': 'buffer'}
+            y_pos += 1
+            rects.loc[len(rects)] = rect
 
     if filename is not None:
         rects.to_csv(filename, index=False)
@@ -94,8 +102,6 @@ def plot_rectangles(rects, filename=None):
     num_cols = math.ceil(math.sqrt(num_presses))
     num_rows = math.ceil(num_presses / num_cols)
     color = sns.color_palette("hls", len(rects['sub_type'].unique())).as_hex()
-    # set buffer color to black, find the rect with sub_type == -1
-    color[rects['sub_type'].unique().tolist().index(-1)] = '#000000'
 
     # Create figure and axes
     fig, axs = plt.subplots(num_rows, num_cols, figsize=(2 * num_cols, 3 * num_rows))
