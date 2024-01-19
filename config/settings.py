@@ -5,8 +5,8 @@ class GlulamConfig:
     # Press settings
     MAX_ROLL_WIDTH = 25000  # 25M roll width
     REGIONS = 2
-    MINIMUM_REGION_DIFFERENCE = 1000  # in mm
-    MAX_ROLL_WIDTH_REGION = [25000, 16000]  # Region 0 can be 25M, Region 1 can be 16M
+    MINIMUM_REGION_DIFFERENCE = 2000  # in mm
+    MIN_ROLL_WIDTH_REGION = 16000  # 16M roll width
     LAYER_HEIGHT = 45.0  # in mm
     MAX_HEIGHT_LAYERS = 26  # number of layers
     MIN_HEIGHT_LAYER_REGION = [11, 26]  # Region 0 must be at least 11 layers, Region 1 must be at least 24 layers
@@ -24,3 +24,4 @@ class GlulamConfig:
     GUROBI_OUTPUT_FLAG = 0  # 0: silent, 1: summary, 2: detailed, 3: verbose
     VERBOSE_LOGGING = False
     ES_MAX_GENERATIONS = 100
+    SAVE_PRESS_TO_PICKLE = False

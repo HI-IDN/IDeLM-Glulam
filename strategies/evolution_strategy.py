@@ -167,7 +167,7 @@ class EvolutionStrategy:
     def _add_stats(self, x, sigma, gen, press):
         if self.stats is None:
             self.stats = {'xstar': [], 'sstar': [], 'sucstar': [], 'waste': [], 'npresses': [], 'x': [], 'sigma': [],
-                          'gen': [], 'run_summary': []
+                          'gen': [], 'run_summary': [], 'press_size': []
                           }
         self.stats['xstar'].append(self.xstar)
         self.stats['sstar'].append(self.sstar)
@@ -178,6 +178,7 @@ class EvolutionStrategy:
         self.stats['sigma'].append(sigma)
         self.stats['gen'].append(gen)
         self.stats['run_summary'].append(press.run_summary)
+        self.stats['press_size'].append(press.press_size)
         logger.info(
             f"Stats - Generation {gen} - waste = {self.waste}, npresses = {self.npresses}, "
             f"xstar = {self.xstar} (#{len(self.xstar)})")
@@ -281,7 +282,7 @@ class EvolutionStrategy:
             (waste_, npresses_), press = self.Objective()
             # Update the best solution found so far if the new solution is better
             if waste_ is not None:
-                if (waste_ <= self.waste and npresses_ <= self.npresses) or (npresses_ < self.npresses):
+                if (waste_ < self.waste and npresses_ <= self.npresses) or (npresses_ < self.npresses):
                     self.Selection(x, sigma, success, press)
                     self.waste, self.npresses = waste_, npresses_
                     logger.info(f"NEW BEST: solution found with waste = {self.waste} and npresses = {self.npresses}")

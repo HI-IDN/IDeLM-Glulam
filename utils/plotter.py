@@ -22,22 +22,20 @@ def get_press_layout(press, filename=None):
 
     # Plot each group
     for k in press.K:
-        y_pos = 0  # Initialize y position for vertical stacking
-        last_r = None
         for r in press.R:
-            if press.Lp_estimated[k][r] == 0:
+            if press.h[k][r] == 0:
                 continue
-            last_r = r
             # Draw press region
-            rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][r], 'y': y_pos,
-                    'w': press.Lp_estimated[k][r], 'h': press.h[k][r], 'type': 'Lp', 'sub_type': 'estimated'}
-            rects.loc[len(rects)] = rect
+            press_rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][r],
+                          'y': sum([press.h[k][rr] for rr in range(r)]),
+                          'w': press.Lp_estimated[k][r], 'h': press.h[k][r], 'type': 'Lp', 'sub_type': 'estimated'}
+            rects.loc[len(rects)] = press_rect
 
             # All patterns used in the press
             patterns = [{
                 'id': j,
                 'pattern': [(i, press.A[i][j]) for i in press.I if press.A[i][j] > 0],
-                'height': int(press.H[j] / GlulamConfig.LAYER_HEIGHT),
+                'height': press.H[j],
                 'width': press.L[j],
                 'repeat': int(press.xn[j][k][r])}
                 for j in press.J if press.x[j][k][r]]
@@ -53,7 +51,7 @@ def get_press_layout(press, filename=None):
                     rect = {'k': k, 'r': r, 'x': GlulamConfig.MAX_ROLL_WIDTH - pattern['width'], 'y': y_pos,
                             'w': pattern['width'], 'h': pattern['height'], 'type': 'pattern',
                             'sub_type': pattern['id']}
-                    rects.loc[len(rects)] = rect
+                    # rects.loc[len(rects)] = rect
 
                     x_pos = GlulamConfig.MAX_ROLL_WIDTH  # Initialize x position for horizontal stacking
                     for (item, item_count) in pattern['pattern']:
@@ -71,15 +69,17 @@ def get_press_layout(press, filename=None):
                             x_pos -= press.patterns.data.widths[item]  # Update x position for next rectangle
 
                     y_pos += pattern['height']  # Update y position for next rectangle
+            assert y_pos == press_rect['y'] + press_rect['h'], \
+                f"Height mismatch: {y_pos} != {press_rect['y'] + press_rect['h']}"
 
         # Plot the buffer used in the press
-        for buffer in range(press.buffer[k]):
-            rect = {'k': k, 'r': last_r,
-                    'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][last_r], 'y': y_pos,
-                    'w': press.Lp_estimated[k][last_r], 'h': 1,
-                    'type': 'buffer'}
-            y_pos += 1
-            rects.loc[len(rects)] = rect
+        last_r = [r for r in press.R if press.h[k][r] > 0][-1]
+        rect = {'k': k, 'r': last_r,
+                'x': GlulamConfig.MAX_ROLL_WIDTH - press.Lp_estimated[k][last_r],
+                'y': sum([press.h[k][r] for r in press.R]),
+                'w': press.Lp_estimated[k][last_r], 'h': press.buffer[k],
+                'type': 'buffer'}
+        rects.loc[len(rects)] = rect
 
     if filename is not None:
         rects.to_csv(filename, index=False)

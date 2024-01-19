@@ -34,7 +34,7 @@ plot_press <- function(file) {
     ) +
     # helper lines that are the constraints
     geom_hline(yintercept = c(11, 24, 26), linetype = "dashed", color = "gray") +
-    geom_vline(xintercept = 16000, linetype = "dashed", color = "gray") +
+    geom_vline(xintercept = 25000-16000, linetype = "dashed", color = "gray") +
     # Items
     geom_rect(
       aes(xmin = x, xmax = x + w, ymin = y, ymax = y + h, fill = item),

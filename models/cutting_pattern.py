@@ -38,7 +38,7 @@ class GlulamPatternProcessor:
         # Create one piece of each item
         for i in range(self.data.m):
             self._A[i, i] = 1
-            self._H[i] = self.data.heights[i]
+            self._H[i] = self.data.layers[i]
             self._W[i] = self.data.widths[i] * self._A[i, i]
             self._RW[i] = self._W[i]  # or rounded to the nearest multiple of GlulamConfig.ROLL_WIDTH_TOLERANCE
 
@@ -48,7 +48,7 @@ class GlulamPatternProcessor:
             copies = min(copies, self.data.quantity[i])  # Never make more copies of the pattern than the demand
             copies = max(copies, 1)  # Make at least one copy of the pattern, even if the demand is 0
             self._A[i, self.data.m + i] = copies
-            self._H[self.data.m + i] = self.data.heights[i]
+            self._H[self.data.m + i] = self.data.layers[i]
             self._W[self.data.m + i] = self.data.widths[i] * self._A[i, self.data.m + i]
             self._RW[self.data.m + i] = self._W[self.data.m + i]
 
@@ -73,7 +73,7 @@ class GlulamPatternProcessor:
 
     @property
     def H(self):
-        """ Pattern height """
+        """ Pattern height in layers """
         return self._H
 
     @property
@@ -192,8 +192,8 @@ class GlulamPatternProcessor:
 
         # Indicator constraints for height limits
         knap_model.addConstrs(z[i] * bigM >= use[i] for i in self.I)  # If z[i] = 0, then use[i] = 0 (Indicator constr.)
-        knap_model.addConstrs(h >= self.data.heights[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
-        knap_model.addConstrs(h <= self.data.heights[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
+        knap_model.addConstrs(h >= self.data.layers[i] - bigM * (1 - z[i]) for i in self.I)  # Height limit low
+        knap_model.addConstrs(h <= self.data.layers[i] + bigM * (1 - z[i]) for i in self.I)  # Height limit high
 
         # Solve the knapsack problem
         knap_model.optimize()

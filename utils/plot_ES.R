@@ -3,26 +3,28 @@ library(cowplot)
 theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 
 read_file <- function(file_name) {
-  print(file_name)
   json <- jsonlite::fromJSON(file_name)
   depth <- json$depth
-  stats_tibble <- data.frame(
+  generations <- 1:length(json$stats$gen)
+  run <- gsub(paste0('soln_ES_d', depth, '_(\\d+).json[.part]*'), '\\1', basename(file_name))
+  print(c(file_name, run))
+  stats_tibble <- tibble(
     generation = json$stats$gen,
-    #xstar = I(json$stats$xstar),
-    #sstar = I(json$stats$sstar),
-    #sucstar = I(json$stats$sucstar),
     waste = json$stats$waste,
-    npresses = json$stats$npresses,
-    x = I(json$stats$x),
-    sigma = I(json$stats$sigma),
     depth = depth,
-    run = file_name
-    #run_summary = ifelse(is.null(json$stats$run_summary), NULL, I(json$stats$run_summary)),
-  )
+    run = as.factor(run),
+  ) %>%
+    mutate(
+      x = map(generations, ~json$stats$x[[.]]),
+    ) %>%
+    cbind(json$stats$run_summary)
+  return(stats_tibble)
 }
 
-plot_depth <- function(run_depth) {
-  dat <- combined_data %>% filter(depth == run_depth)
+plot_depth <- function(dat) {
+  if (nrow(dat) == 0) {
+    return(ggplot() + theme_void())
+  }
 
   # Create the facetted plot
   p1 <- ggplot(dat, aes(x = generation, y = npresses, color = run)) +
@@ -46,7 +48,8 @@ plot_depth <- function(run_depth) {
     theme(plot.margin = margin(20, 10, 10, 10, "pt"))
 }
 
-files <- list.files("data/v1.0/", pattern = "\\.json|\\.json.part$", full.names = TRUE)
+working_dir <- 'data/v1.1/'
+files <- list.files(working_dir, pattern = "\\.json|\\.json.part$", full.names = TRUE)
 combined_data <- map_df(files, read_file)
 combined_data %>%
   group_by(depth) %>%
@@ -56,14 +59,25 @@ combined_data %>%
     max_presses = max(npresses),
   )
 
-p90a <- ggplot()
-p90b <- ggplot()
-p115 <- plot_depth(115)
-p140 <- plot_depth(140)
-p160 <- plot_depth(160)
-p185 <- plot_depth(185)
+p90a <- plot_depth(combined_data %>% filter(depth == 90))
+p90b <- plot_depth(combined_data %>% filter(depth == 90))
+p115 <- plot_depth(combined_data %>% filter(depth == 115))
+p140 <- plot_depth(combined_data %>% filter(depth == 140))
+p160 <- plot_depth(combined_data %>% filter(depth == 160))
+p185 <- plot_depth(combined_data %>% filter(depth == 185))
 combined_plot <- plot_grid(p90a, p90b, p115, p140, p160, p185, ncol = 2, align = "hv", rel_heights = c(1, 1),
                            labels = c("a) 90mm #1", "b) 90mm #2", "c) 115mm", "d) 140mm", "e) 160mm", "f) 185mm"),
                            label_size = 10)
-ggsave("data/v1.0/ES_run.png", plot = combined_plot, width = 7.16, height = 8, units = "in", dpi = 300)
+ggsave(paste0(working_dir, 'ES_run.png'), plot = combined_plot, width = 7.16, height = 8, units = "in", dpi = 300)
 
+
+combined_data %>%
+  group_by(depth) %>%
+  unnest(x) %>%
+  mutate(best_press = -npresses) %>%
+  ggplot(aes(x = generation, y = x, color = run)) +
+  geom_point(aes(size = best_press)) +
+  scale_y_continuous(labels = function(x) { ifelse(x == 0, "", unit_format(unit = "m", scale = 1 / 1000)(x)) },
+                     limits = c(0, 25000), 'Roll widths for pattern') +
+  facet_wrap(~depth, labeller = as_labeller(function(value) { paste("Depth", as.numeric(value), 'mm') }),
+             scales = 'free_x', ncol = 1)

@@ -4,6 +4,7 @@ import numpy as np
 from config.settings import GlulamConfig
 from utils.logger import setup_logger
 import time
+import pickle
 from utils.plotter import get_press_layout, plot_rectangles
 
 # Setup logger
@@ -208,6 +209,7 @@ class GlulamPackagingProcessor:
         self.h = None
         self.buffer = None
         self.run_summary = None
+        self.press_size = None
 
         # parameters
         bigM = 1e8  # a big number
@@ -250,7 +252,7 @@ class GlulamPackagingProcessor:
 
         # compute height of each region
         pmodel.addConstrs(
-            (gp.quicksum((self.H[j] / GlulamConfig.LAYER_HEIGHT) * x[j, k, r] for j in self.J) == h[k, r]
+            (gp.quicksum(self.H[j] * x[j, k, r] for j in self.J) == h[k, r]
              for k in self.K for r in self.R), name="height")
 
         # the total height of the region must be less than the maximum height of the press
@@ -294,12 +296,13 @@ class GlulamPackagingProcessor:
                 (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
                 name="if_region1_then_region0")
 
-            # now there is the condition that is region 0 is below 24 then region 1 must have length less than 16m
+            # make sure that the length of the region is at least the minimum length,
+            # but if the region is not used in the press (i.e. z=1) then ignore the constraint.
             pmodel.addConstrs(
-                (Lp[k, r] >= GlulamConfig.MAX_ROLL_WIDTH_REGION[1] - h1[k] * bigM - (1 - z[k, 1]) * bigM
+                (Lp[k, r] >= GlulamConfig.MIN_ROLL_WIDTH_REGION - h1[k] * bigM - (1 - z[k, r]) * bigM
                  for r in self.R for k in self.K[:-1]), name="Lp_minimum_length")
 
-            # make sure that all pattern length in region 1 are smaller than those in region 0
+            # make sure that all pattern length in region 1 are sufficiently smaller than those in region 0
             pmodel.addConstrs(
                 (Lp[k, 0] >= Lp[k, 1] + GlulamConfig.MINIMUM_REGION_DIFFERENCE - (1 - z[k, 1]) * bigM for k in self.K),
                 name="Lp0_greater_than_Lp1")
@@ -363,6 +366,7 @@ class GlulamPackagingProcessor:
         logger.debug(f'h:\n{self.h}')
         self.Lp_estimated = np.array([[Lp[k, r].X for r in self.R] for k in self.K], dtype=int)
         logger.debug(f'Lp estimated:\n{self.Lp_estimated}')
+        self.press_size = [(k, r, h[k, r].X, int(Lp[k, r].X)) for k in self.K for r in self.R if z[k, r].X > 0.1]
         self.buffer = np.array([B[k].X for k in self.K], dtype=int)
         logger.debug(f'B:\t{", ".join([str(x) for x in self.buffer])}')
 
@@ -370,7 +374,8 @@ class GlulamPackagingProcessor:
         self.Lp_actual = np.max(self.L[:, None, None] * self.x, axis=0).astype(int)
         logger.debug(f'Lp actual:\n{self.Lp_actual}')
         self.Waste = np.sum(
-            self.H[:, None, None] * (self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x / 1e6,
+            self.H[:, None, None] * (
+                    self.Lp_estimated[None, :, :] - self.L[:, None, None]) * self.x * GlulamConfig.LAYER_HEIGHT / 1e6,
             axis=0)  # Waste in m^2
         logger.info(f'Total waste: {self.TotalWaste:.3f} m^2')
         logger.debug(f'Waste:\n{self.Waste}')
@@ -433,15 +438,14 @@ class GlulamPackagingProcessor:
 
             for j in self.J:
                 if self.x[j, k, r]:
-                    tot_press_height += self.xn[j, k, r] * self.H[j] / GlulamConfig.LAYER_HEIGHT
+                    tot_press_height += self.xn[j, k, r] * self.H[j]
                     for i in self.I:
                         if self.A[i, j] > 0:
                             item_waste = self.H[j] * (self.Lp_estimated[k, r] - self.L[j]) * self.x[
-                                j, k, r] / 1000 / 1000
+                                j, k, r] * GlulamConfig.LAYER_HEIGHT / 1e6
                             item_used = self.xn[j, k, r] * self.A[i, j]
                             pattern_used = self.x[j, k, r]
-                            item_info = [f"{k}.{r}", i, self.b[i], f"{item_waste:.2f}", j, self.L[j],
-                                         np.round(self.H[j] / GlulamConfig.LAYER_HEIGHT),
+                            item_info = [f"{k}.{r}", i, self.b[i], f"{item_waste:.2f}", j, self.L[j], self.H[j],
                                          pattern_used, item_used, self.Lp_estimated[k, r], f"{self.RW[j]:.0f}"]
                             print(row_format.format(*item_info))
                             # Keep track of total values
@@ -471,8 +475,8 @@ class GlulamPackagingProcessor:
         df['Order'] = self.patterns.data.order
         df['D'] = self.patterns.data.depths
         df['W'] = self.patterns.data.widths
-        df['H'] = self.patterns.data.heights
-        df['h'] = self.patterns.data.layers
+        df['H'] = self.patterns.data.layers
+        df['h'] = self.patterns.data.heights
         df['b'] = self.patterns.data.quantity
         # xj = np.array([np.sum([x[j,k,r].X for k in self.K for r in self.R]) for j in self.J])
         df['Ax'] = np.dot(self.A, np.sum(self.xn, axis=(1, 2)))
@@ -497,11 +501,11 @@ class GlulamPackagingProcessor:
         logger.info(f'Pattern information: (n={self.patterns.n})')
 
         df = pd.DataFrame(
-            columns=['h', 'H', 'L', 'Area', 'PatFr', 'ItCr', 'TotIt', 'RW'] + [f'P{k}' for k in self.K])
+            columns=['H', 'h', 'L', 'Area', 'PatFr', 'ItCr', 'TotIt', 'RW'] + [f'P{k}' for k in self.K])
         df['H'] = self.H
         df['h'] = (self.H / GlulamConfig.LAYER_HEIGHT).astype(int)
         df['L'] = self.L
-        df['Area'] = self.H * self.L / 1000000
+        df['Area'] = df['h'] * self.L / 1e6
         df['PatFr'] = np.sum(self.xn, axis=(1, 2))
         df['ItCr'] = np.sum(self.A, axis=0)
         df['TotIt'] = df['PatFr'] * df['ItCr']
@@ -522,9 +526,9 @@ class GlulamPackagingProcessor:
         """ Table pertaining to set K (of all presses). """
         logger.info(f'Press information: ({self.number_of_presses} number of presses)')
         df = pd.DataFrame(
-            columns=['Press', 'Region', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Patterns', 'Items'])
-        df['Press'] = [k for k in self.K for r in self.R]
-        df['Region'] = [r for k in self.K for r in self.R]
+            columns=['P', 'R', 'h', 'H', 'Lp', 'Lp¹', 'HxLp', 'Area', 'Waste', 'Pat', 'Its'])
+        df['P'] = [k for k in self.K for r in self.R]
+        df['R'] = [r for k in self.K for r in self.R]
         df['Lp'] = [self.Lp_estimated[k, r] for k in self.K for r in self.R]
         df['Lp¹'] = [self.Lp_actual[k, r] for k in self.K for r in self.R]
         df['h'] = [self.h[k, r] for k in self.K for r in self.R]
@@ -533,24 +537,23 @@ class GlulamPackagingProcessor:
         df['Area'] = [np.sum(self.H[:, None, None] * (self.L[:, None, None]) * self.x / 1e6, axis=0)[k, r]
                       for k in self.K for r in self.R]
         df['Waste'] = [self.Waste[k, r] for k in self.K for r in self.R]
-        df['Patterns'] = [np.sum(self.xn[:, k, r]) for k in self.K for r in self.R]
-        df['Items'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.xn, axis=(1, 0))[k, r]
+        df['Pat'] = [np.sum(self.xn[:, k, r]) for k in self.K for r in self.R]
+        df['Its'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.xn, axis=(1, 0))[k, r]
                        for k in self.K for r in self.R]
-        df['Buffer'] = [self.buffer[k] if r == 0 else 0 for k in self.K for r in self.R]
+        df['Buf'] = [self.buffer[k] if r == 0 else 0 for k in self.K for r in self.R]
 
         print("\n\nTable: Press & Region Information\n")
         print(df)
 
-        df_ = df.groupby(['Press']).agg({'Area': 'sum', 'Waste': 'sum', 'Patterns': 'sum', 'Items': 'sum',
-                                         'Buffer': 'sum'})
+        df_ = df.groupby(['P']).agg({'Area': 'sum', 'Waste': 'sum', 'Pat': 'sum', 'Its': 'sum', 'Buf': 'sum'})
         print("\n\nTable: Press Information\n")
         print(df_)
 
-        print('Lp (mm): Estimated length of press')
-        print('Lp¹ (mm): Actual length of press')
-        print('HxLp (m²): Estimated area of press')
-        print('HxLp¹ (m²): Actual area of press')
-        print('Waste (m²): Waste in press HxLp - ΣHxLj (pattern j in press)')
+        logger.debug('Lp (mm): Estimated length of press')
+        logger.debug('Lp¹ (mm): Actual length of press')
+        logger.debug('HxLp (m²): Estimated area of press')
+        logger.debug('HxLp¹ (m²): Actual area of press')
+        logger.debug('Waste (m²): Waste in press HxLp - ΣHxLj (pattern j in press)')
         print(f'Total area of all presses: {np.sum(df["Area"]):.2f}m²')
         print(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
         print(f'Number of patterns in press: {np.sum(df["Patterns"])}')
@@ -561,6 +564,13 @@ class GlulamPackagingProcessor:
         """ Save results to csv and png. """
         assert self.solved, "Model must be solved before saving results."
         assert filename.endswith('.csv'), "Filename must end with .csv"
+
+        if GlulamConfig.SAVE_PRESS_TO_PICKLE:
+            pkl_filename = filename.replace('.csv', '.pkl')
+            with open(pkl_filename, 'wb') as f:
+                pickle.dump(self, f)
+            logger.debug(f"Saving results to {pkl_filename}.")
+
         rects = get_press_layout(self, filename)
         logger.info(f"Saved rectangle results to {filename}.")
 
