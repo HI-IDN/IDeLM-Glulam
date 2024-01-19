@@ -35,9 +35,6 @@ plot_press <- function(file) {
     # helper lines that are the constraints
     geom_hline(yintercept = c(11, 24, 26), linetype = "dashed", color = "gray") +
     geom_vline(xintercept = 16000, linetype = "dashed", color = "gray") +
-    # annotate where the regions are
-    geom_text(data = press_block, aes(x = x + w, y = y + h, label = paste0('R[', r, ']')), parse = TRUE,
-              size = 2, hjust = 1.1, vjust = 1.1) +
     # Items
     geom_rect(
       aes(xmin = x, xmax = x + w, ymin = y, ymax = y + h, fill = item),
@@ -50,19 +47,22 @@ plot_press <- function(file) {
       pattern_color = "black", pattern_fill = "black",
       fill = NA, color = 'black', linewidth = 0.1,
     ) +
+    # annotate where the regions are
+    geom_text(data = press_block, aes(x = x, y = y+h, label = paste0('R[', r, ']')), parse = TRUE,
+              size = 2, hjust = 1.1, vjust = 1) +
     scale_fill_viridis_d(name = 'Item', guide = "none") +
     facet_wrap(~k, labeller = as_labeller(function(value) { paste("Press #", as.numeric(value) + 1) })) +
     scale_y_continuous(labels = function(x) paste("#", x)) +
     scale_x_continuous(labels = function(x) { ifelse(x == 0, "", unit_format(unit = "m", scale = 1 / 1000)(x)) },
-                       limits = c(0, 25000)) +
+                       limits = c(-100, 25000)) +
     labs(caption = info, x = NULL, y = "Layers") + # Update axis labels
     theme(legend.position = "bottom")  # Move legends below the plot
 
   # filename replaces .csv with .png
   filename <- gsub("\\.csv$", ".png", file)
-  ggsave(filename, plot = plot, width = 7.16, height = 6, units = "in", dpi = 300)
+  ggsave(filename, plot = plot, width = 7.16, height = 3, units = "in", dpi = 300)
   return(plot)
 }
 
-files <- list.files("data/v1.0/", pattern = "\\.csv$", full.names = TRUE)
+files <- list.files("data/v1.1/", pattern = "\\.csv$", full.names = TRUE)
 plots <- map(files, plot_press)
