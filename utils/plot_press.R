@@ -18,7 +18,7 @@ plot_press <- function(file) {
   used_area <- area %>% filter(type == 'item') %>% pull(area)
   info <- paste0("Depth: ", gsub(".*_d(\\d+).*", "\\1", file), "mm, ",
                  "Presses: ", max(press$k) + 1, ', ',
-                 "Items: ", length(levels(items)), ', ',
+                 "Items: ", length(levels(items$item)), ', ',
                  "Area: ", round(total_area, 2), "m\u00b2, ",
                  "Waste:", round(total_area - used_area, 2), "m\u00b2")
 
