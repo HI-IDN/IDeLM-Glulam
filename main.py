@@ -48,9 +48,9 @@ def main(file_path, depth, name, run, mode, overwrite, roll_widths, max_presses)
 
     if mode == "ES":
         # Evolutionary Search mode
-        evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
         while True:
             try:
+                evolution_strategy = EvolutionStrategy(data, max_generations=GlulamConfig.ES_MAX_GENERATIONS)
                 evolution_strategy.Search(filename, x=roll_widths)
                 break
             except Exception as e:
