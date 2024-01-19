@@ -64,5 +64,5 @@ plot_press <- function(file) {
   return(plot)
 }
 
-files <- list.files("data/v1.1/", pattern = "\\.csv$", full.names = TRUE)
+files <- list.files("data/v1.2/", pattern = "\\.csv$", full.names = TRUE)
 plots <- map(files, plot_press)

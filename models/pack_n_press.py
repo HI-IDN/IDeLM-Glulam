@@ -516,11 +516,11 @@ class GlulamPackagingProcessor:
 
         print("\n\nTable: Pattern Information\n")
         print(df.sort_values(by=['TotIt', 'PatFr']))
-        print(f'Total patterns: n={self.patterns.n}')
-        print(f'Total Area of all Pattern (Σ HxL * PatFr) {np.sum(df["Area"] * df["PatFr"]):.2f}m²')
-        print(f'Pattern Usage Frequency (Σ PatFr) {np.sum(df["PatFr"])}')
-        print(f'Items Created by Pattern (Σ ItCr * PatFr) {np.sum(df["ItCr"] * df["PatFr"])}')
-        print(f'Total Items Produced (Σ TotIt) {np.sum(df["TotIt"])}')
+        logger.info(f'Total patterns: n={self.patterns.n}')
+        logger.info(f'Total Area of all Pattern (Σ HxL * PatFr) {np.sum(df["Area"] * df["PatFr"]):.2f}m²')
+        logger.info(f'Pattern Usage Frequency (Σ PatFr) {np.sum(df["PatFr"])}')
+        logger.info(f'Items Created by Pattern (Σ ItCr * PatFr) {np.sum(df["ItCr"] * df["PatFr"])}')
+        logger.info(f'Total Items Produced (Σ TotIt) {np.sum(df["TotIt"])}')
 
     def table_set_K(self):
         """ Table pertaining to set K (of all presses). """
@@ -554,11 +554,11 @@ class GlulamPackagingProcessor:
         logger.debug('HxLp (m²): Estimated area of press')
         logger.debug('HxLp¹ (m²): Actual area of press')
         logger.debug('Waste (m²): Waste in press HxLp - ΣHxLj (pattern j in press)')
-        print(f'Total area of all presses: {np.sum(df["Area"]):.2f}m²')
-        print(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
-        print(f'Number of patterns in press: {np.sum(df["Patterns"])}')
-        print(f'Number of items in press: {np.sum(df["Items"])}')
-        print(f'Number of buffer items in press: {np.sum(self.buffer)}')
+        logger.info(f'Total area of all presses: {np.sum(df["Area"]):.2f}m²')
+        logger.info(f'Total waste in all presses: {np.sum(df["Waste"]):.2f}m²')
+        logger.info(f'Number of patterns in press: {np.sum(df["Pat"])}')
+        logger.info(f'Number of items in press: {np.sum(df["Its"])}')
+        logger.info(f'Number of buffer items in press: {np.sum(self.buffer)}')
 
     def save(self, filename, filename_png=None):
         """ Save results to csv and png. """

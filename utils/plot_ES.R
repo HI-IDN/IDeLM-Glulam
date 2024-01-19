@@ -48,7 +48,7 @@ plot_depth <- function(dat) {
     theme(plot.margin = margin(20, 10, 10, 10, "pt"))
 }
 
-working_dir <- 'data/v1.1/'
+working_dir <- 'data/v1.2/'
 files <- list.files(working_dir, pattern = "\\.json|\\.json.part$", full.names = TRUE)
 combined_data <- map_df(files, read_file)
 combined_data %>%
