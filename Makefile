@@ -25,8 +25,8 @@ $(addprefix es_, $(DEPTHS)):
 		make data/$(VERSION)/soln_ES_d$(depth)_$(run).json depth=$(depth) run=$(run);)
 
 
-data/$(VERSION)/soln_ES_d$(depth)_$(run).json:
+data/$(VERSION)/soln_ES_d$(depth)_$(run).json: $(FILE)
 	@echo "Running ES for depth $(depth) run $(run)"
 	@mkdir -p data/$(VERSION)
 	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) \
-		--file $(or $(FILE),$(error Missing data file)) | tee $(@:.json=.log) 2>&1
+		--file $(or $(FILE),$(error Missing data file))
