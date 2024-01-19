@@ -299,7 +299,7 @@ class GlulamPackagingProcessor:
             # make sure that the length of the region is at least the minimum length,
             # but if the region is not used in the press (i.e. z=1) then ignore the constraint.
             pmodel.addConstrs(
-                (Lp[k, r] >= GlulamConfig.MIN_ROLL_WIDTH_REGION - h1[k] * bigM - (1 - z[k, r]) * bigM
+                (Lp[k, r] >= GlulamConfig.MIN_ROLL_WIDTH - h1[k] * bigM - (1 - z[k, r]) * bigM
                  for r in self.R for k in self.K[:-1]), name="Lp_minimum_length")
 
             # make sure that all pattern length in region 1 are sufficiently smaller than those in region 0

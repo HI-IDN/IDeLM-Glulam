@@ -4,9 +4,9 @@ class GlulamConfig:
 
     # Press settings
     MAX_ROLL_WIDTH = 25000  # 25M roll width
+    MIN_ROLL_WIDTH = 16000  # 16M roll width
     REGIONS = 2
     MINIMUM_REGION_DIFFERENCE = 2000  # in mm
-    MIN_ROLL_WIDTH_REGION = 16000  # 16M roll width
     LAYER_HEIGHT = 45.0  # in mm
     MAX_HEIGHT_LAYERS = 26  # number of layers
     MIN_HEIGHT_LAYER_REGION = [11, 26]  # Region 0 must be at least 11 layers, Region 1 must be at least 24 layers
