@@ -243,7 +243,7 @@ class GlulamPackagingProcessor:
         F = pmodel.addVars(self.J, self.K, self.R)
         """ The surplus of pattern j in press k and region r. """
 
-        B = pmodel.addVars(self.K, vtype=gp.GRB.INTEGER)
+        B = pmodel.addVars(self.K)
         """ The number of buffer items in each press. """
 
         # indicate if a pattern is used or not in press k region r

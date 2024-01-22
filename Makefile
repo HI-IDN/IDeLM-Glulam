@@ -1,4 +1,4 @@
-.PHONY: all single es
+.PHONY: all single es stats
 
 # Define the number of runs
 NUM_RUNS := 10
@@ -30,3 +30,16 @@ data/$(VERSION)/soln_ES_d$(depth)_$(run).json: $(FILE)
 	@mkdir -p data/$(VERSION)
 	python3 main.py --mode ES --depth $(depth) --run $(run) --name $(VERSION) \
 		--file $(or $(FILE),$(error Missing data file))
+
+
+
+stats:
+	@echo "Generating stats"
+	Rscript utils/plot_ES.R
+	# for all csv files in data/$(VERSION) generate a plot
+	@$(foreach file,$(wildcard data/$(VERSION)/*.csv), \
+		make $(file:.csv=.png) --no-print-directory;)
+
+%.png: %.csv utils/plot_press.R
+	@echo "Plotting $@"
+	Rscript utils/plot.R $< $@

@@ -2,9 +2,23 @@ library(tidyverse)
 library(ggpattern)
 library(scales)
 theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
+# Read the filename from the command line
+args <- commandArgs(trailingOnly = TRUE)
+file_in <- args[1]
+file_out <- args[2]
 
-plot_press <- function(file) {
-  press <- read_csv(file)
+
+# Make sure the file exists and is a .csv file
+if (!file.exists(file_in) || !grepl("\\.csv$", file_in)) {
+  stop("File does not exist or is not a .csv file")
+}
+# and the output file is a .png file
+if (!grepl("\\.png$", file_out)) {
+  stop("Output file must be a .png file")
+}
+
+plot_press <- function(file_in, file_out="") {
+  press <- read_csv(file_in)
   area <- press %>%
     group_by(type) %>%
     mutate(h = h * 0.045, w = w / 1e3, area = h * w) %>%
@@ -58,11 +72,9 @@ plot_press <- function(file) {
     labs(caption = info, x = NULL, y = "Layers") + # Update axis labels
     theme(legend.position = "bottom")  # Move legends below the plot
 
-  # filename replaces .csv with .png
-  filename <- gsub("\\.csv$", ".png", file)
-  ggsave(filename, plot = plot, width = 7.16, height = 3, units = "in", dpi = 300)
+  if (file_out != "")
+  { ggsave(file_out, plot = plot, width = 7.16, height = 3, units = "in", dpi = 300) }
   return(plot)
 }
 
-files <- list.files("data/v1.2/", pattern = "\\.csv$", full.names = TRUE)
-plots <- map(files, plot_press)
+plot_press(file)
