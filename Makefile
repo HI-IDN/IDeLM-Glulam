@@ -35,11 +35,16 @@ data/$(VERSION)/soln_ES_d$(depth)_$(run).json: $(FILE)
 
 stats:
 	@echo "Generating stats"
-	Rscript utils/plot_ES.R
+	#make data/$(VERSION)/ES_run.png
 	# for all csv files in data/$(VERSION) generate a plot
 	@$(foreach file,$(wildcard data/$(VERSION)/*.csv), \
 		make $(file:.csv=.png) --no-print-directory;)
 
 %.png: %.csv utils/plot_press.R
 	@echo "Plotting $@"
-	Rscript utils/plot.R $< $@
+	Rscript utils/plot_press.R $< $@
+
+%/ES_run.png: JSON_FILES=$(wildcard $*/*.json*)
+%/ES_run.png: utils/plot_ES.R $(JSON_FILES)
+	@echo "Parsing $@"
+	Rscript utils/plot_ES.R $@ $(JSON_FILES)

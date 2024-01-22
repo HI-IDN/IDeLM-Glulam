@@ -2,6 +2,15 @@ library(tidyverse)
 library(cowplot)
 theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 
+# read the files from the command line
+args <- commandArgs(trailingOnly = TRUE)
+output_file <- args[1]
+files <- args[2:length(args)]
+# make sure the output file is a .png file
+if (!grepl("\\.png$", output_file)) {
+  stop("Output file must be a .png file")
+}
+
 read_file <- function(file_name) {
   json <- jsonlite::fromJSON(file_name)
   depth <- json$depth
@@ -48,8 +57,6 @@ plot_depth <- function(dat) {
     theme(plot.margin = margin(20, 10, 10, 10, "pt"))
 }
 
-working_dir <- 'data/v1.2/'
-files <- list.files(working_dir, pattern = "\\.json|\\.json.part$", full.names = TRUE)
 combined_data <- map_df(files, read_file)
 combined_data %>%
   group_by(depth) %>%
@@ -57,6 +64,7 @@ combined_data %>%
     runs = length(unique(run)),
     min_presses = min(npresses),
     max_presses = max(npresses),
+    mu_presses = mean(npresses),
   )
 
 p90a <- plot_depth(combined_data %>% filter(depth == 90))
@@ -68,16 +76,4 @@ p185 <- plot_depth(combined_data %>% filter(depth == 185))
 combined_plot <- plot_grid(p90a, p90b, p115, p140, p160, p185, ncol = 2, align = "hv", rel_heights = c(1, 1),
                            labels = c("a) 90mm #1", "b) 90mm #2", "c) 115mm", "d) 140mm", "e) 160mm", "f) 185mm"),
                            label_size = 10)
-ggsave(paste0(working_dir, 'ES_run.png'), plot = combined_plot, width = 7.16, height = 8, units = "in", dpi = 300)
-
-
-combined_data %>%
-  group_by(depth) %>%
-  unnest(x) %>%
-  mutate(best_press = -npresses) %>%
-  ggplot(aes(x = generation, y = x, color = run)) +
-  geom_point(aes(size = best_press)) +
-  scale_y_continuous(labels = function(x) { ifelse(x == 0, "", unit_format(unit = "m", scale = 1 / 1000)(x)) },
-                     limits = c(0, 25000), 'Roll widths for pattern') +
-  facet_wrap(~depth, labeller = as_labeller(function(value) { paste("Depth", as.numeric(value), 'mm') }),
-             scales = 'free_x', ncol = 1)
+ggsave(output_file, plot = combined_plot, width = 7.16, height = 8, units = "in", dpi = 300)

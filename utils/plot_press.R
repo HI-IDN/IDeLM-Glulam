@@ -1,12 +1,10 @@
 library(tidyverse)
 library(ggpattern)
-library(scales)
 theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 # Read the filename from the command line
 args <- commandArgs(trailingOnly = TRUE)
 file_in <- args[1]
 file_out <- args[2]
-
 
 # Make sure the file exists and is a .csv file
 if (!file.exists(file_in) || !grepl("\\.csv$", file_in)) {
@@ -17,8 +15,8 @@ if (!grepl("\\.png$", file_out)) {
   stop("Output file must be a .png file")
 }
 
-plot_press <- function(file_in, file_out="") {
-  press <- read_csv(file_in)
+plot_press <- function(file_in, file_out = "") {
+  press <- read_csv(file_in, show_col_types = FALSE)
   area <- press %>%
     group_by(type) %>%
     mutate(h = h * 0.045, w = w / 1e3, area = h * w) %>%
@@ -30,7 +28,7 @@ plot_press <- function(file_in, file_out="") {
 
   total_area <- area %>% filter(type == 'Lp') %>% pull(area)
   used_area <- area %>% filter(type == 'item') %>% pull(area)
-  info <- paste0("Depth: ", gsub(".*_d(\\d+).*", "\\1", file), "mm, ",
+  info <- paste0("Depth: ", gsub(".*_d(\\d+).*", "\\1", file_in), "mm, ",
                  "Presses: ", max(press$k) + 1, ', ',
                  "Items: ", length(levels(items$item)), ', ',
                  "Area: ", round(total_area, 2), "m\u00b2, ",
@@ -48,7 +46,7 @@ plot_press <- function(file_in, file_out="") {
     ) +
     # helper lines that are the constraints
     geom_hline(yintercept = c(11, 24, 26), linetype = "dashed", color = "gray") +
-    geom_vline(xintercept = 25000-16000, linetype = "dashed", color = "gray") +
+    geom_vline(xintercept = 25000 - 16000, linetype = "dashed", color = "gray") +
     # Items
     geom_rect(
       aes(xmin = x, xmax = x + w, ymin = y, ymax = y + h, fill = item),
@@ -62,19 +60,21 @@ plot_press <- function(file_in, file_out="") {
       fill = NA, color = 'black', linewidth = 0.1,
     ) +
     # annotate where the regions are
-    geom_text(data = press_block, aes(x = x, y = y+h, label = paste0('R[', r, ']')), parse = TRUE,
+    geom_text(data = press_block, aes(x = x, y = y + h, label = paste0('R[', r, ']')), parse = TRUE,
               size = 2, hjust = 1.1, vjust = 1) +
     scale_fill_viridis_d(name = 'Item', guide = "none") +
     facet_wrap(~k, labeller = as_labeller(function(value) { paste("Press #", as.numeric(value) + 1) })) +
     scale_y_continuous(labels = function(x) paste("#", x)) +
-    scale_x_continuous(labels = function(x) { ifelse(x == 0, "", unit_format(unit = "m", scale = 1 / 1000)(x)) },
+    scale_x_continuous(labels = function(x) { ifelse(x == 0, "", scales::unit_format(unit = "m", scale = 1 / 1000)(x)
+    ) },
                        limits = c(-100, 25000)) +
     labs(caption = info, x = NULL, y = "Layers") + # Update axis labels
     theme(legend.position = "bottom")  # Move legends below the plot
 
   if (file_out != "")
-  { ggsave(file_out, plot = plot, width = 7.16, height = 3, units = "in", dpi = 300) }
-  return(plot)
+  { ggsave(file = file_out, plot = plot, width = 7.16, height = 3, units = "in", dpi = 300) }
+  else
+  { print(plot) }
 }
 
-plot_press(file)
+plot_press(file_in, file_out)
