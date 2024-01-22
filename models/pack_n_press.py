@@ -314,7 +314,7 @@ class GlulamPackagingProcessor:
         for j in self.J:
             if any(self.A[i, j] > 0 for i in self.I_priority):  # This pattern produces a priority item
                 pmodel.addConstrs(
-                    (x1[j, k, r] == 0 for k in self.K[:-1] for r in self.R), name="no_priority_in_last_press")
+                    (x1[j, self.K[-1], r] == 0 for r in self.R), name="no_priority_in_last_press")
 
         # define the surplus of each pattern in each press and region as the difference between the length of the
         # pattern and the length of the region
