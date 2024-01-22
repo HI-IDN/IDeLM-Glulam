@@ -285,12 +285,12 @@ class GlulamPackagingProcessor:
         pmodel.addConstrs((x[j, k, r] <= bigM * z[k, r] for j in self.J for k in self.K for r in self.R),
                           name="if_press_is_not_used_then_x_is_zero")
 
-        # h1[k] will indicate that the height of region 0 is less than 24 layers
-        pmodel.addConstrs(
-            (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
-             for k in self.K[:-1]), name="h1_if_region_0_is_less_than_min_layers")
-
         if self._number_of_regions > 1:
+            # h1[k] will indicate that the height of region 0 is less than 24 layers
+            pmodel.addConstrs(
+                (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
+                 for k in self.K[:-1]), name="h1_if_region_0_is_less_than_min_layers")
+
             # if region 1 is used then region 0 must be used
             pmodel.addConstrs(
                 (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
@@ -539,7 +539,7 @@ class GlulamPackagingProcessor:
         df['Waste'] = [self.Waste[k, r] for k in self.K for r in self.R]
         df['Pat'] = [np.sum(self.xn[:, k, r]) for k in self.K for r in self.R]
         df['Its'] = [np.sum(self.A[:, :, np.newaxis, np.newaxis] * self.xn, axis=(1, 0))[k, r]
-                       for k in self.K for r in self.R]
+                     for k in self.K for r in self.R]
         df['Buf'] = [self.buffer[k] if r == 0 else 0 for k in self.K for r in self.R]
 
         print("\n\nTable: Press & Region Information\n")
