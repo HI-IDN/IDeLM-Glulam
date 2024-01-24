@@ -8,7 +8,7 @@ def process_file(file_path, output_file):
     print(f"Processing {file_path}")
     # log file does not exist, create it
     log = pd.DataFrame(columns=['timestamp', 'where', 'message'])
-    summary = pd.DataFrame(columns=['type', 'duration', 'generation'])
+    summary = pd.DataFrame(columns=['type', 'value', 'generation'])
     with open(file_path, 'r') as file:
         for line in file:
             columns = line.split(" - ")
@@ -21,11 +21,14 @@ def process_file(file_path, output_file):
 
     assert len(log) > 0, f"Log {file_path} cannot be processed, summary is empty"
 
+    # Drop any duplicate rows, if any - keep the first one make sure they have the same timestamp, where and message
+    log = log.drop_duplicates(subset=['timestamp', 'where', 'message'], keep='first')
+
     start_time = log.iloc[0]['timestamp']
     end_time = log.iloc[-1]['timestamp']
 
-    generation = 0
-    generation_start = start_time
+    generation = None
+    generation_start = None
     for row in log.itertuples():
         if row.where == "GlulamPackagingProc":
             if row.message.startswith("First feasible solution found after"):
@@ -41,13 +44,18 @@ def process_file(file_path, output_file):
             if row.message.startswith("Total waste: "):
                 waste = float(row.message.split("Total waste: ")[1].split(" m^2")[0])
                 summary.loc[len(summary)] = ['waste', waste, generation]
-            if row.message.startswith("Pattern information: "):
-                patterns = int(row.message.split("Pattern information: (n=")[1].split(")")[0])
-                summary.loc[len(summary)] = ['patterns', patterns, generation]
             if row.message.startswith("Total patterns: "):
                 patterns = int(row.message.split("Total patterns: n=")[1])
                 summary.loc[len(summary)] = ['total_patterns', patterns, generation]
         elif row.where == "GlulamES":
+            if row.message.startswith("Initialising the Evolutionary Search"):
+                generation_start = row.timestamp
+                generation = 0
+                # get all rows that have generation None
+                not_remove = summary['generation'].isnull()
+                if not all(not_remove):
+                    print(f"Warning: removed {sum(not_remove == False)} rows")
+                    summary = summary.drop(summary[summary['generation'] >= 0].index)
             if row.message.startswith("Generation"):
                 generation = int(row.message.split(" ")[1].split("/")[0])
                 generation_start = row.timestamp
