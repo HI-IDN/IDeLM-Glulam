@@ -18,8 +18,19 @@ read_json <- function(file_name) {
     mutate(
       x = map(generations, ~json$stats$x[[.]]),
       xstar = map(generations, ~json$stats$xstar[[.]])
-    ) %>% cbind(json$stats$run_summary)
+    ) %>%
+    cbind(json$stats$run_summary)
   return(stats_tibble)
+}
+
+read_log <- function(file_name) {
+  # read the log file it is a csv with a header
+  log <- read.csv(file_name, header = T)
+  # get the depth from the file name
+  depth <- as.integer(gsub(paste0('ES_', '(\\d+)_.*'), '\\1', basename(file_name)))
+  # get the run number from the file name
+  run <- as.integer(gsub(paste0('ES_\\d+_(\\d+)_.*'), '\\1', basename(file_name)))
+  log %>% mutate(depth = depth, run = run)
 }
 
 
