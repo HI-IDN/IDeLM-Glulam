@@ -18,7 +18,7 @@ read_json <- function(file_name) {
     mutate(
       x = map(generations, ~json$stats$x[[.]]),
       xstar = map(generations, ~json$stats$xstar[[.]])
-    ) #%>% cbind(json$stats$run_summary)
+    ) %>% cbind(json$stats$run_summary)
   return(stats_tibble)
 }
 
