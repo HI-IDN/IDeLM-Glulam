@@ -17,9 +17,6 @@ class GlulamDataProcessor:
         self._filtered_data = raw_data[raw_data['depth'] == depth]
         self.depth = depth
 
-        assert all(self._filtered_data['layers'] * GlulamConfig.LAYER_HEIGHT == self._filtered_data['height']), \
-            "Height mismatch: layers * layer_height != height"
-
         # Check if there are any beams with height greater than the maximum allowed height
         # Warn the user and set the height to the maximum allowed height
         too_tall = self._filtered_data['layers'] > GlulamConfig.MAX_HEIGHT_LAYERS
@@ -27,6 +24,10 @@ class GlulamDataProcessor:
             logging.warning(f"The following beams are too tall and will be truncated to "
                             f"{GlulamConfig.MAX_HEIGHT_LAYERS} layers:\n{self._filtered_data[too_tall]}")
             self._filtered_data.loc[too_tall, 'layers'] = GlulamConfig.MAX_HEIGHT_LAYERS
+            self._filtered_data.loc[too_tall, 'height'] = GlulamConfig.MAX_HEIGHT_LAYERS * GlulamConfig.LAYER_HEIGHT
+
+        assert all(self._filtered_data['layers'] * GlulamConfig.LAYER_HEIGHT == self._filtered_data['height']), \
+            "Height mismatch: layers * layer_height != height"
 
         # Reset index
         self._filtered_data.reset_index(drop=True, inplace=True)
