@@ -1,10 +1,10 @@
-library(tidyverse)
-library(ggpattern)
-theme_set(theme_minimal(base_size = 10)) # Adjust the base_size as needed
 # Read the filename from the command line
 args <- commandArgs(trailingOnly = TRUE)
 file_in <- args[1]
 file_out <- args[2]
+
+source("utils/common.R")
+library(ggpattern)
 
 # Make sure the file exists and is a .csv file
 if (!file.exists(file_in) || !grepl("\\.csv$", file_in)) {
