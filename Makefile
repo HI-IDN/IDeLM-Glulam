@@ -36,7 +36,8 @@ data/$(VERSION)/soln_ES_d$(depth)_$(run).json: $(FILE)
 
 stats:
 	@echo "Generating stats"
-	#make data/$(VERSION)/ES_run.png
+	@$(foreach depth,$(DEPTHS), \
+		make data/$(VERSION)/ES_run_d$(depth).png DEPTH=$(depth);)
 	# for all csv files in data/$(VERSION) generate a plot
 	@$(foreach file,$(wildcard data/$(VERSION)/*.csv), \
 		make $(file:.csv=.png) --no-print-directory;)
@@ -47,9 +48,9 @@ stats:
 	@echo "Plotting $@"
 	Rscript utils/plot_press.R $< $@
 
-%/ES_run.png: JSON_FILES=$(wildcard $*/*.json*)
-%/ES_run.png: utils/plot_ES.R $(JSON_FILES)
-	Rscript utils/plot_ES.R $@ $(JSON_FILES)
+%/ES_run_d$(DEPTH).png: JSON := $(wildcard data/$(VERSION)/soln_ES_d$(DEPTH)_*.json*)
+%/ES_run_d$(DEPTH).png: utils/plot_ES.R
+	Rscript utils/plot_ES.R $@ $(JSON)
 
 %.log: %.err utils/parse_log.py
 	python3 utils/parse_log.py --raw_log $< --output_file $@

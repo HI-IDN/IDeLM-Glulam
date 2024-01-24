@@ -20,13 +20,14 @@ read_file <- function(file_name) {
   stats_tibble <- tibble(
     generation = json$stats$gen,
     waste = json$stats$waste,
+    npresses = json$stats$npresses,
     depth = depth,
     run = as.factor(run),
   ) %>%
     mutate(
       x = map(generations, ~json$stats$x[[.]]),
-    ) %>%
-    cbind(json$stats$run_summary)
+      xstar = map(generations, ~json$stats$xstar[[.]])
+    )
   return(stats_tibble)
 }
 
@@ -38,27 +39,26 @@ plot_depth <- function(dat) {
   # Create the facetted plot
   p1 <- ggplot(dat, aes(x = generation, y = npresses, color = run)) +
     geom_line() +
-    labs(y = "Presses", x = NULL) +
+    labs(y = expression(k['max']), x = NULL) +
     scale_y_continuous(labels = function(x) paste("#", x),
                        breaks = seq(min(dat$npresses), max(dat$npresses), 1)) +
     scale_color_brewer(palette = "Paired") +
     theme(legend.position = "none")
 
-  p2 <- ggplot(dat, aes(x = generation, y = waste, color = run)) +
+  p2 <- dat %>%
+    ggplot(aes(x = generation, y = waste, color = run)) +
     geom_line() +
-    scale_y_sqrt(labels = function(x) { paste0(x, " m", "\u00b2") }) +  # Use custom label function
+    scale_y_log10(labels = function(x) { paste0(x, " m", "\u00b2") }) +  # Use custom label function
     labs(y = "Waste", x = "Generation") +
     scale_color_brewer(palette = "Paired") +
     theme(legend.position = "none")
 
   # Combine both plots into a single facetted plot
-  plot_grid(p1, p2, nrow = 2, align = "v", rel_heights = c(0.4, 1)) +
-    #increase the top margin for a better title
-    theme(plot.margin = margin(20, 10, 10, 10, "pt"))
+  plot_grid(p1, p2, nrow = 2, align = "v", rel_heights = c(0.4, 1))
 }
 
-combined_data <- map_df(files, read_file)
-combined_data %>%
+es <- map_df(files, read_file)
+es %>%
   group_by(depth) %>%
   summarise(
     runs = length(unique(run)),
@@ -67,13 +67,5 @@ combined_data %>%
     mu_presses = mean(npresses),
   )
 
-p90a <- plot_depth(combined_data %>% filter(depth == 90))
-p90b <- plot_depth(combined_data %>% filter(depth == 90))
-p115 <- plot_depth(combined_data %>% filter(depth == 115))
-p140 <- plot_depth(combined_data %>% filter(depth == 140))
-p160 <- plot_depth(combined_data %>% filter(depth == 160))
-p185 <- plot_depth(combined_data %>% filter(depth == 185))
-combined_plot <- plot_grid(p90a, p90b, p115, p140, p160, p185, ncol = 2, align = "hv", rel_heights = c(1, 1),
-                           labels = c("a) 90mm #1", "b) 90mm #2", "c) 115mm", "d) 140mm", "e) 160mm", "f) 185mm"),
-                           label_size = 10)
-ggsave(output_file, plot = combined_plot, width = 7.16, height = 8, units = "in", dpi = 300)
+plot <- plot_depth(es) + theme(plot.margin = margin(5.5, 5.5, 5.5, 5.5, "pt"))
+ggsave(output_file, plot = plot, width = 3.2, height = 2.5, units = "in", dpi = 300)
