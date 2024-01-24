@@ -8,6 +8,7 @@ RUNS := $(shell seq 1 $(shell expr $(NUM_RUNS)))
 
 # Retrieve git tag, fall back to short commit hash if no tags are found
 VERSION := $(shell git describe --tags --always --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
+SLURMOUTPUT := $(shell pwd)/data/slurm
 
 # Define depths
 DEPTHS := 90 115 140 160 185
@@ -39,6 +40,8 @@ stats:
 	# for all csv files in data/$(VERSION) generate a plot
 	@$(foreach file,$(wildcard data/$(VERSION)/*.csv), \
 		make $(file:.csv=.png) --no-print-directory;)
+	@$(foreach log,$(wildcard $(SLURMOUTPUT)/*.err), \
+		make $(log:.err=.log) --no-print-directory;)
 
 %.png: %.csv utils/plot_press.R
 	@echo "Plotting $@"
@@ -46,5 +49,7 @@ stats:
 
 %/ES_run.png: JSON_FILES=$(wildcard $*/*.json*)
 %/ES_run.png: utils/plot_ES.R $(JSON_FILES)
-	@echo "Parsing $@"
 	Rscript utils/plot_ES.R $@ $(JSON_FILES)
+
+%.log: %.err utils/parse_log.py
+	python3 utils/parse_log.py --raw_log $< --output_file $@
