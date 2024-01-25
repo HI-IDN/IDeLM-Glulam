@@ -292,9 +292,7 @@ class GlulamPackagingProcessor:
                  for k in self.K[:-1]), name="h1_if_region_0_is_less_than_min_layers")
 
             # if region 1 is used then region 0 must be used
-            pmodel.addConstrs(
-                (gp.quicksum(x[j, k, 0] for j in self.J) >= z[k, 1] for k in self.K),
-                name="if_region1_then_region0")
+            pmodel.addConstrs((z[k, 0] >= z[k, 1] for k in self.K), name="if_region1_then_region0")
 
             # make sure that the length of the region is at least the minimum length,
             # but if the region is not used in the press (i.e. z=1) then ignore the constraint.

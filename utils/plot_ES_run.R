@@ -11,7 +11,7 @@ if (!grepl("\\.png$", file_out)) {
   stop("Output file must be a .png file")
 }
 
-es <- map_df(json_files, read_json)
+es <- read_jsons(json_files)
 es %>%
   group_by(depth) %>%
   summarise(
@@ -24,7 +24,7 @@ es %>%
   )
 
 log_files <- list.files("data/slurm/", "*log", full.names = T)
-log <- map_df(log_files, read_log)
+log <- read_logs(log_files)
 
 # what is the order of magnitude of the number of patterns and constraints?
 pdat <- es %>%
@@ -32,7 +32,7 @@ pdat <- es %>%
   mutate(depth = as.factor(depth), grp = interaction(run, depth)) %>%
   ggplot(aes(x = generation, y = npatterns, color = depth, group = grp)) +
   geom_line() +
-  labs(x = "Generation", y = expression(n), color = 'Depth (mm)') +
+  labs(x = "Generation", y = expression(n), color = 'Depth\n(mm)') +
   scale_color_brewer(palette = "Set1") +
   theme(legend.position = "bottom") +
   guides(color = guide_legend(nrow = 2))
@@ -55,11 +55,5 @@ pdur <- log %>%
   scale_y_sqrt() +
   theme(legend.position = "none")
 
-plot_grid(pdat, pdur, rel_widths = c(1.5, 1), ncol = 2)
-ggsave(file_out, width = 5, height = 4, units = "in", dpi = 300)
-
-
-log %>%
-  filter(type == 'first_feasible') %>%
-  group_by(depth) %>%
-  summarise(mu_fea = mean(value / 60), mx_fea = max(value / 60))
+p <- plot_grid(pdat, pdur, rel_widths = c(1.5, 1), ncol = 2)
+ggsave(file_out, plot=p, width = 5, height = 4, units = "in", dpi = 300)

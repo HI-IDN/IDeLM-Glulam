@@ -35,7 +35,8 @@ plot_depth <- function(dat) {
   plot_grid(p1, p2, nrow = 2, align = "v", rel_heights = c(0.4, 1))
 }
 
-es <- map_df(files, read_json)
+
+es <- read_jsons(files)
 es %>%
   group_by(depth) %>%
   summarise(

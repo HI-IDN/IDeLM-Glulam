@@ -11,7 +11,7 @@ VERSION := $(shell git describe --tags --always --abbrev=0 2>/dev/null || git re
 SLURMOUTPUT := $(shell pwd)/data/slurm
 
 # Define depths
-DEPTHS := 90 115 140 160 185
+DEPTHS := 90 115 140 160 185 91
 
 # Main target for ES mode
 all: es

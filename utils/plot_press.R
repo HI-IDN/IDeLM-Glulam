@@ -65,9 +65,9 @@ plot_press <- function(file_in, file_out = "") {
     scale_fill_viridis_d(name = 'Item', guide = "none") +
     facet_wrap(~k, labeller = as_labeller(function(value) { paste("Press #", as.numeric(value) + 1) })) +
     scale_y_continuous(labels = function(x) paste("#", x)) +
-    scale_x_continuous(labels = function(x) { ifelse(x == 0, "", scales::unit_format(unit = "m", scale = 1 / 1000)(x)
-    ) },
-                       limits = c(-100, 25000)) +
+    scale_x_continuous(
+      labels = function(x) { scales::unit_format(unit = "m", scale = 1 / 1000)(25000 - x) },
+      limits = c(-100, 25000)) +
     labs(caption = info, x = NULL, y = "Layers") + # Update axis labels
     theme(legend.position = "bottom")  # Move legends below the plot
 

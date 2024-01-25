@@ -37,7 +37,7 @@ plot_rollwidths <- function(dat, eps = 0) {
     theme(legend.position = "none")
 }
 
-es <- map_df(files, read_json)
+es <- read_jsons(files)
 a5 <- 148 * 210 / 1e6
 plot_rollwidths(es, eps = a5)
 ggsave(output_file, width = 4, height = 3, units = "in", dpi = 300)
