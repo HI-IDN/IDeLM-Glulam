@@ -286,19 +286,17 @@ class GlulamPackagingProcessor:
                           name="if_press_is_not_used_then_x_is_zero")
 
         if self._number_of_regions > 1:
-            # h1[k] will indicate that the height of region 0 is less than 24 layers
-            pmodel.addConstrs(
-                (h1[k] <= (GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - h[k, 0]) / GlulamConfig.MIN_HEIGHT_LAYER_REGION[1]
-                 for k in self.K[:-1]), name="h1_if_region_0_is_less_than_min_layers")
-
             # if region 1 is used then region 0 must be used
             pmodel.addConstrs((z[k, 0] >= z[k, 1] for k in self.K), name="if_region1_then_region0")
 
-            # make sure that the length of the region is at least the minimum length,
-            # but if the region is not used in the press (i.e. z=1) then ignore the constraint.
+            # h1[k] will indicate that we have 2 regions, and region 1 is less than 16 meters
             pmodel.addConstrs(
-                (Lp[k, r] >= GlulamConfig.MIN_ROLL_WIDTH - h1[k] * bigM - (1 - z[k, r]) * bigM
-                 for r in self.R for k in self.K[:-1]), name="Lp_minimum_length")
+                (h1[k] <= z[k, 1] for k in self.K[:-1]), name="h1_region1_used")
+            pmodel.addConstrs(
+                (Lp[k, 1] + bigM * (1 - h1[k]) >= 16000 for k in self.K[:-1]), name="Lp1_is_less_than_16m")
+            pmodel.addConstrs(
+                (h[k, 0] >= GlulamConfig.MIN_HEIGHT_LAYER_REGION[1] - bigM * (1 - h1[k]) for k in self.K[:-1]),
+                name="h0_must_meet_min_height_24_if_region1_is_less_than_16m")
 
             # make sure that all pattern length in region 1 are sufficiently smaller than those in region 0
             pmodel.addConstrs(
