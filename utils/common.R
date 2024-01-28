@@ -29,7 +29,7 @@ read_jsons <- function(file_names) {
     mutate(
       depth = factor(depth,
                      levels = c(90, 91, 115, 140, 160, 185),
-                     labels = c('90 (1)', '91 (2)', '115', '140', '160', '185')))
+                     labels = c('90 (1)', '90 (2)', '115', '140', '160', '185')))
 }
 
 read_logs <- function(files) {
@@ -49,9 +49,10 @@ read_logs <- function(files) {
   map_df(files, read_log) %>%
     mutate(depth = factor(depth,
                           levels = c(90, 91, 115, 140, 160, 185),
-                          labels = c('90 (1)', '91 (2)', '115', '140', '160', '185'))
+                          labels = c('90 (1)', '90 (2)', '115', '140', '160', '185'))
     )
 }
 
 area_press <- 25000 * 45 * 26 / 1e6
-
+a5 <- 148 * 210 / 1e6
+a4 <- 210 * 297 / 1e6
