@@ -129,25 +129,25 @@ class TestGlulamPackagingProcessor(unittest.TestCase):
             for region in self.press.R:
                 self.assertTrue(
                     (np.sum(self.press.h[:, range(0, region + 1)], axis=1)[:-1] >=
-                     GlulamConfig.MIN_HEIGHT_LAYER_REGION[region]).all(), f"Min height is not met in region {region}.")
+                     GlulamConfig.MIN_HEIGHT_LAYERS[region]).all(), f"Min height is not met in region {region}.")
 
             # Check if roll width is within bounds
-            self.assertTrue((self.press.Lp_estimated <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
+            self.assertTrue((self.press.L_estimated <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
                             "Max roll width is exceeded.")
-            self.assertTrue((self.press.Lp_actual <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
+            self.assertTrue((self.press.L_actual <= GlulamConfig.MAX_ROLL_WIDTH).flatten().all(),
                             "Max roll width is exceeded.")
             for region in self.press.R:
                 self.assertTrue(
-                    (self.press.Lp_estimated[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
-                    f"Max roll width is not met in region {region}, is {self.press.Lp_estimated[region]} "
+                    (self.press.L_estimated[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
+                    f"Max roll width is not met in region {region}, is {self.press.L_estimated[region]} "
                     f">{GlulamConfig.MAX_ROLL_WIDTH_REGION[region]}.")
                 self.assertTrue(
-                    (self.press.Lp_actual[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
-                    f"Max roll width is not met in region {region}, is {self.press.Lp_actual[region]} "
+                    (self.press.L_actual[region] <= GlulamConfig.MAX_ROLL_WIDTH_REGION[region]).all(),
+                    f"Max roll width is not met in region {region}, is {self.press.L_actual[region]} "
                     f">{GlulamConfig.MAX_ROLL_WIDTH_REGION[region]}.")
                 if region > 0:
                     self.assertTrue(
-                        (self.press.Lp_estimated[:, region] < self.press.Lp_estimated[:, region - 1]).all(),
+                        (self.press.L_estimated[:, region] < self.press.L_estimated[:, region - 1]).all(),
                         f"Roll width is not decreasing in region {region}.")
 
         self.press.update_number_of_presses(5)
