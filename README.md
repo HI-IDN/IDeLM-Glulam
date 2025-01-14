@@ -91,3 +91,24 @@ IDeLM-Glulam/
 ├── requirements.txt            # List of dependencies for the project
 └── main.py                     # Main script to run the optimizer
 ```
+
+## Citing This Work
+
+If you use this package in your research or for educational purposes, please cite the following publication:
+
+> H. Ingimundardottir and T. P. Runarsson, "Evolving Submodels for Column Generation in Cutting and Packing for Glulam Production," 2024 IEEE Congress on Evolutionary Computation (CEC), Yokohama, Japan, 2024, pp. 1-8, doi: [10.1109/CEC60901.2024.10612070](https://doi.org/10.1109/CEC60901.2024.10612070).
+
+### Example BibTeX Entry
+```bibtex
+@INPROCEEDINGS{Ingimundardottir2024,
+  author={Ingimundardottir, Helga and Runarsson, Thomas Philip},
+  booktitle={2024 IEEE Congress on Evolutionary Computation (CEC)}, 
+  title={Evolving Submodels for Column Generation in Cutting and Packing for Glulam Production}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={1-8},
+  keywords={Pressing;Evolutionary computation;Production facilities;Manufacturing;Iterative methods;Feeds;Optimization;Glued laminated timber;column generation;evolutionary strategy;cutting and packing problems;real-world application},
+  doi={10.1109/CEC60901.2024.10612070}
+}
+```
